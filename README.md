@@ -1,6 +1,6 @@
 # LifeOS Voice Server
 
-A local-first, voice-driven personal operating system. Talk to it to start a focused work session, check in during it, and close it out. Everything runs on your machine — no cloud, no subscriptions.
+A local-first, voice-driven personal operating system. Talk to it to start a focused work session, check in during it, and close it out. Everything runs on your machine no cloud, no subscriptions.
 
 ---
 
@@ -10,7 +10,7 @@ A local-first, voice-driven personal operating system. Talk to it to start a foc
 - **Talk freely** during a session — the LLM responds contextually
 - **End a session** by saying *"done"* or tapping the End button
 - **Hear a summary** and a session memory is stored locally in SQLite
-- **Review your timeline** — a chronological log of all completed sessions
+- **Review your timeline**— a chronological log of all completed sessions
 
 All audio processing (STT, TTS) runs locally. Ollama provides the optional LLM layer.
 
@@ -32,7 +32,7 @@ All audio processing (STT, TTS) runs locally. Ollama provides the optional LLM l
 
 ```bash
 git clone <repo-url>
-cd lifeos/5
+cd basic_mvp
 bash start.sh
 ```
 
@@ -276,8 +276,8 @@ Fixed in `ws/handler.py` — update to the latest version.
 
 ## Data & Privacy
 
-- All audio is processed **locally** — nothing is sent to external servers
-- Transcriptions are **ephemeral** — only session lifecycle events are stored
+- All audio is processed **locally** : nothing is sent to external servers
+- Transcriptions are **ephemeral** : only session lifecycle events are stored
 - Session summaries (LLM-generated) are stored in `data/lifeos.db`
-- The database is a plain SQLite file — inspect it with any SQLite browser
+- The database is a plain SQLite file : inspect it with any SQLite browser
 
