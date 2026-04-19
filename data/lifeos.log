@@ -1,0 +1,244 @@
+INFO:     Started server process [21220]
+INFO:     Waiting for application startup.
+2026-04-19 13:46:23,192 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-base.en/revision/main "HTTP/1.1 200 OK"
+2026-04-19 13:46:23,341 INFO server.voice.stt: STT model loaded: base.en
+2026-04-19 13:46:23,825 INFO server.voice.tts: TTS loaded: piper-tts Python package
+2026-04-19 13:46:23,827 INFO server.events.store: Event store initialized at /Users/vinay10949/Projects/lifeos/5/data/lifeos.db
+2026-04-19 13:46:23,837 INFO httpx: HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2026-04-19 13:46:23,843 INFO httpx: HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2026-04-19 13:46:23,843 INFO server.main: LifeOS Voice Server ready — STT: ready, TTS: ready, Ollama: available, LLM: available
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:57018 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57020 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:57022 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57022 - "GET /api/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57022 - "GET /sw.js HTTP/1.1" 304 Not Modified
+2026-04-19 13:46:29,220 INFO server.session.manager: Session state: idle -> listening
+2026-04-19 13:46:31,531 INFO faster_whisper: Processing audio with duration 00:02.560
+2026-04-19 13:46:31,555 INFO faster_whisper: VAD filter removed 00:01.376 of audio
+2026-04-19 13:46:31,808 INFO server.session.manager: Session state: listening -> processing
+2026-04-19 13:46:31,808 INFO server.session.manager: Session state: processing -> intent_resolved
+2026-04-19 13:46:31,808 INFO server.governing_loop: Loop [1/12] Input: 'Hello!'
+2026-04-19 13:46:33,936 INFO httpx: HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-19 13:46:33,938 INFO server.governing_loop: Loop [7/12] Intent: REQUEST_GUIDANCE (llm)
+2026-04-19 13:46:33,938 INFO server.governing_loop: Loop [8/12] Using canned response
+2026-04-19 13:46:33,939 INFO server.governing_loop: Loop [12/12] Response: 'What do you want to move forward right now?'
+2026-04-19 13:46:34,084 INFO server.session.manager: Session state: intent_resolved -> idle
+2026-04-19 13:46:34,084 INFO server.session.manager: Session state: idle -> listening
+2026-04-19 13:46:34,084 INFO faster_whisper: Processing audio with duration 00:00.768
+2026-04-19 13:46:34,088 INFO faster_whisper: VAD filter removed 00:00.768 of audio
+2026-04-19 13:46:34,090 INFO faster_whisper: Processing audio with duration 00:01.536
+2026-04-19 13:46:34,093 INFO faster_whisper: VAD filter removed 00:01.536 of audio
+INFO:     127.0.0.1:57042 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+2026-04-19 13:46:46,121 INFO faster_whisper: Processing audio with duration 00:09.472
+2026-04-19 13:46:46,157 INFO faster_whisper: VAD filter removed 00:07.808 of audio
+2026-04-19 13:46:46,422 INFO server.session.manager: Session state: listening -> processing
+2026-04-19 13:46:46,422 INFO server.session.manager: Session state: processing -> intent_resolved
+2026-04-19 13:46:46,422 INFO server.governing_loop: Loop [1/12] Input: 'Start the session.'
+2026-04-19 13:46:46,422 INFO server.governing_loop: Loop [7/12] Intent: START_SESSION (keyword)
+2026-04-19 13:46:46,422 INFO server.governing_loop: Loop [8/12] Using canned response
+2026-04-19 13:46:46,423 INFO server.session.manager: Session state: intent_resolved -> session_active
+2026-04-19 13:46:46,424 INFO server.governing_loop: Loop [12/12] Response: 'Starting your session.'
+2026-04-19 13:47:12,208 INFO server.session.manager: Session state: session_active -> listening
+2026-04-19 13:47:12,209 INFO server.session.manager: Session state: listening -> processing
+2026-04-19 13:47:12,209 INFO server.session.manager: Session state: processing -> intent_resolved
+2026-04-19 13:47:12,209 INFO server.governing_loop: Loop [1/12] Input: '(tap to end)'
+2026-04-19 13:47:12,209 INFO server.governing_loop: Loop [7/12] Intent: END_SESSION (tap)
+2026-04-19 13:47:12,209 INFO server.governing_loop: Loop [8/12] Using canned response
+2026-04-19 13:47:12,209 INFO server.session.manager: Session state: intent_resolved -> session_active
+2026-04-19 13:47:12,210 INFO server.session.manager: Session state: session_active -> completing
+2026-04-19 13:47:12,212 INFO server.session.manager: Session state: completing -> completed
+2026-04-19 13:47:12,212 INFO server.session.manager: Session state: completed -> idle
+INFO:     connection closed
+2026-04-19 13:47:14,738 INFO httpx: HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-19 13:47:14,740 INFO server.governing_loop: Loop [11/12] Session summary stored (0 interactions distilled)
+2026-04-19 13:47:14,741 INFO server.governing_loop: Loop [12/12] Response: 'You moved something forward. Take a pause.'
+INFO:     127.0.0.1:57057 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:57059 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57059 - "GET /api/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57059 - "GET /sw.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:57059 - "POST /api/tts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57059 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+2026-04-19 13:47:26,565 INFO server.session.manager: Session state: idle -> listening
+INFO:     127.0.0.1:57064 - "POST /api/tts HTTP/1.1" 200 OK
+2026-04-19 13:47:34,245 INFO faster_whisper: Processing audio with duration 00:05.376
+2026-04-19 13:47:34,266 INFO faster_whisper: VAD filter removed 00:03.984 of audio
+2026-04-19 13:47:34,552 INFO server.session.manager: Session state: listening -> processing
+2026-04-19 13:47:34,553 INFO server.session.manager: Session state: processing -> intent_resolved
+2026-04-19 13:47:34,553 INFO server.governing_loop: Loop [1/12] Input: 'Start the session.'
+2026-04-19 13:47:34,553 INFO server.governing_loop: Loop [7/12] Intent: START_SESSION (keyword)
+2026-04-19 13:47:34,553 INFO server.governing_loop: Loop [8/12] Using canned response
+2026-04-19 13:47:34,553 INFO server.session.manager: Session state: intent_resolved -> session_active
+2026-04-19 13:47:34,554 INFO server.governing_loop: Loop [12/12] Response: 'Starting your session.'
+2026-04-19 13:47:34,588 INFO server.session.manager: Session state: session_active -> listening
+2026-04-19 13:47:44,236 INFO faster_whisper: Processing audio with duration 00:09.472
+2026-04-19 13:47:44,271 INFO faster_whisper: VAD filter removed 00:06.720 of audio
+2026-04-19 13:47:44,576 INFO server.session.manager: Session state: listening -> processing
+2026-04-19 13:47:44,576 INFO server.session.manager: Session state: processing -> intent_resolved
+2026-04-19 13:47:44,576 INFO server.governing_loop: Loop [1/12] Input: 'Can you tell me about football and soccer?'
+2026-04-19 13:47:44,957 INFO httpx: HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-19 13:47:44,960 INFO server.governing_loop: Loop [7/12] Intent: REQUEST_GUIDANCE (llm)
+2026-04-19 13:47:46,880 INFO httpx: HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-19 13:47:46,884 INFO server.governing_loop: Loop [8/12] LLM response generated (200 chars)
+2026-04-19 13:47:46,884 INFO server.governing_loop: Loop [12/12] Response: "They're the same game, but with different names in different parts of the world."
+2026-04-19 13:47:47,148 INFO server.session.manager: Session state: intent_resolved -> session_active
+2026-04-19 13:47:47,148 INFO server.session.manager: Session state: session_active -> listening
+2026-04-19 13:47:47,148 INFO faster_whisper: Processing audio with duration 00:01.536
+2026-04-19 13:47:47,151 INFO faster_whisper: VAD filter removed 00:01.536 of audio
+2026-04-19 13:48:00,607 INFO faster_whisper: Processing audio with duration 00:02.048
+2026-04-19 13:48:00,618 INFO faster_whisper: VAD filter removed 00:02.048 of audio
+2026-04-19 13:48:01,373 INFO faster_whisper: Processing audio with duration 00:00.768
+2026-04-19 13:48:01,378 INFO faster_whisper: VAD filter removed 00:00.768 of audio
+2026-04-19 13:48:14,952 INFO faster_whisper: Processing audio with duration 00:13.568
+2026-04-19 13:48:15,010 INFO faster_whisper: VAD filter removed 00:12.064 of audio
+2026-04-19 13:48:15,299 INFO server.session.manager: Session state: listening -> processing
+2026-04-19 13:48:15,299 INFO server.session.manager: Session state: processing -> intent_resolved
+2026-04-19 13:48:15,299 INFO server.governing_loop: Loop [1/12] Input: 'Stop the session.'
+2026-04-19 13:48:15,299 INFO server.governing_loop: Loop [7/12] Intent: END_SESSION (keyword)
+2026-04-19 13:48:15,299 INFO server.governing_loop: Loop [8/12] Using canned response
+2026-04-19 13:48:15,299 INFO server.session.manager: Session state: intent_resolved -> session_active
+2026-04-19 13:48:15,299 INFO server.session.manager: Session state: session_active -> completing
+2026-04-19 13:48:15,300 INFO server.session.manager: Session state: completing -> completed
+2026-04-19 13:48:15,300 INFO server.session.manager: Session state: completed -> idle
+2026-04-19 13:48:19,291 INFO httpx: HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-19 13:48:19,292 INFO server.governing_loop: Loop [11/12] Session summary stored (1 interactions distilled)
+2026-04-19 13:48:19,292 INFO server.governing_loop: Loop [12/12] Response: 'You moved something forward. Take a pause.'
+2026-04-19 13:48:19,372 INFO server.session.manager: Session state: idle -> listening
+INFO:     127.0.0.1:57096 - "GET /api/timeline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57096 - "GET /api/sessions/550031b4-7666-4cc9-b319-96397f52e2e0 HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [21220]
+INFO:     Started server process [23074]
+INFO:     Waiting for application startup.
+2026-04-19 14:04:30,638 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-base.en/revision/main "HTTP/1.1 200 OK"
+2026-04-19 14:04:30,790 INFO server.voice.stt: STT model loaded: base.en
+2026-04-19 14:04:31,639 INFO server.voice.tts: TTS loaded: piper-tts Python package
+2026-04-19 14:04:31,643 INFO server.events.store: Event store initialized at /Users/vinay10949/Projects/basic_mvp/data/lifeos.db
+2026-04-19 14:04:31,653 INFO httpx: HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2026-04-19 14:04:31,660 INFO httpx: HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2026-04-19 14:04:31,660 INFO server.main: LifeOS Voice Server ready — STT: ready, TTS: ready, Ollama: available, LLM: available
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:57672 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57674 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:57676 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57676 - "GET /api/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57676 - "GET /sw.js HTTP/1.1" 200 OK
+2026-04-19 14:04:36,110 INFO server.session.manager: Session state: idle -> listening
+2026-04-19 14:04:40,980 INFO faster_whisper: Processing audio with duration 00:05.120
+2026-04-19 14:04:41,009 INFO faster_whisper: VAD filter removed 00:05.120 of audio
+2026-04-19 14:04:42,259 INFO faster_whisper: Processing audio with duration 00:01.280
+2026-04-19 14:04:42,266 INFO faster_whisper: VAD filter removed 00:01.280 of audio
+2026-04-19 14:04:43,540 INFO faster_whisper: Processing audio with duration 00:01.280
+2026-04-19 14:04:43,548 INFO faster_whisper: VAD filter removed 00:01.280 of audio
+2026-04-19 14:04:45,590 INFO faster_whisper: Processing audio with duration 00:02.048
+2026-04-19 14:04:45,601 INFO faster_whisper: VAD filter removed 00:01.216 of audio
+2026-04-19 14:04:49,723 INFO server.session.manager: Session state: listening -> processing
+2026-04-19 14:04:49,723 INFO server.session.manager: Session state: processing -> intent_resolved
+2026-04-19 14:04:49,723 INFO server.governing_loop: Loop [1/12] Input: "Okay.  Good.  So.  I'm going to move it here.  Okay.  Okay.  Okay.  Okay.  So.  "
+2026-04-19 14:04:53,304 INFO httpx: HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-19 14:04:53,306 INFO server.governing_loop: Loop [7/12] Intent: UNCLEAR (llm)
+2026-04-19 14:04:53,307 INFO server.governing_loop: Loop [8/12] Using canned response
+2026-04-19 14:04:53,307 INFO server.governing_loop: Loop [12/12] Response: "I didn't catch that. You can say 'start session' or tell me what you want to mov"
+2026-04-19 14:04:54,132 INFO server.session.manager: Session state: intent_resolved -> idle
+2026-04-19 14:04:54,132 INFO server.session.manager: Session state: idle -> listening
+2026-04-19 14:04:54,133 INFO faster_whisper: Processing audio with duration 00:01.024
+2026-04-19 14:04:54,135 INFO faster_whisper: VAD filter removed 00:01.024 of audio
+2026-04-19 14:04:54,136 INFO faster_whisper: Processing audio with duration 00:01.536
+2026-04-19 14:04:54,139 INFO faster_whisper: VAD filter removed 00:01.536 of audio
+2026-04-19 14:04:54,140 INFO faster_whisper: Processing audio with duration 00:01.536
+2026-04-19 14:04:54,143 INFO faster_whisper: VAD filter removed 00:01.536 of audio
+2026-04-19 14:04:54,145 INFO faster_whisper: Processing audio with duration 00:03.072
+INFO:     127.0.0.1:57695 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+2026-04-19 14:04:54,151 INFO faster_whisper: VAD filter removed 00:03.072 of audio
+INFO:     127.0.0.1:57714 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:57716 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57716 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57716 - "GET /api/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57716 - "GET /sw.js HTTP/1.1" 200 OK
+2026-04-19 14:05:00,948 INFO faster_whisper: Processing audio with duration 00:02.304
+2026-04-19 14:05:00,960 INFO faster_whisper: VAD filter removed 00:02.304 of audio
+2026-04-19 14:05:01,969 INFO faster_whisper: Processing audio with duration 00:01.024
+2026-04-19 14:05:01,976 INFO faster_whisper: VAD filter removed 00:01.024 of audio
+INFO:     127.0.0.1:57728 - "POST /api/tts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57728 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     connection closed
+INFO:     127.0.0.1:57734 - "POST /api/tts HTTP/1.1" 200 OK
+2026-04-19 14:05:14,302 INFO faster_whisper: Processing audio with duration 00:06.656
+2026-04-19 14:05:14,332 INFO faster_whisper: VAD filter removed 00:04.960 of audio
+2026-04-19 14:05:14,614 INFO server.session.manager: Session state: listening -> processing
+2026-04-19 14:05:14,614 INFO server.session.manager: Session state: processing -> intent_resolved
+2026-04-19 14:05:14,614 INFO server.governing_loop: Loop [1/12] Input: 'Can you start the session?'
+2026-04-19 14:05:14,614 INFO server.governing_loop: Loop [7/12] Intent: START_SESSION (keyword)
+2026-04-19 14:05:14,614 INFO server.governing_loop: Loop [8/12] Using canned response
+2026-04-19 14:05:14,614 INFO server.session.manager: Session state: intent_resolved -> session_active
+2026-04-19 14:05:14,616 INFO server.governing_loop: Loop [12/12] Response: 'Starting your session.'
+2026-04-19 14:05:14,647 INFO server.session.manager: Session state: session_active -> listening
+2026-04-19 14:05:20,954 INFO faster_whisper: Processing audio with duration 00:06.144
+2026-04-19 14:05:20,996 INFO faster_whisper: VAD filter removed 00:01.696 of audio
+2026-04-19 14:05:21,293 INFO server.session.manager: Session state: listening -> processing
+2026-04-19 14:05:21,293 INFO server.session.manager: Session state: processing -> intent_resolved
+2026-04-19 14:05:21,293 INFO server.governing_loop: Loop [1/12] Input: 'Please tell me about Leonel Messi.'
+2026-04-19 14:05:21,587 INFO httpx: HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-19 14:05:21,590 INFO server.governing_loop: Loop [7/12] Intent: REQUEST_GUIDANCE (llm)
+2026-04-19 14:05:23,844 INFO httpx: HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-19 14:05:23,846 INFO server.governing_loop: Loop [8/12] LLM response generated (200 chars)
+2026-04-19 14:05:23,848 INFO server.governing_loop: Loop [12/12] Response: 'Leonel Messi is a renowned Argentine soccer player, widely regarded as one of th'
+2026-04-19 14:05:24,116 INFO server.session.manager: Session state: intent_resolved -> session_active
+2026-04-19 14:05:24,117 INFO server.session.manager: Session state: session_active -> listening
+2026-04-19 14:05:37,335 INFO faster_whisper: Processing audio with duration 00:04.096
+2026-04-19 14:05:37,359 INFO faster_whisper: VAD filter removed 00:04.096 of audio
+2026-04-19 14:05:51,159 INFO faster_whisper: Processing audio with duration 00:13.824
+2026-04-19 14:05:51,205 INFO faster_whisper: VAD filter removed 00:10.064 of audio
+2026-04-19 14:05:51,487 INFO server.session.manager: Session state: listening -> processing
+2026-04-19 14:05:51,487 INFO server.session.manager: Session state: processing -> intent_resolved
+2026-04-19 14:05:51,487 INFO server.governing_loop: Loop [1/12] Input: 'But how does he compare with Christiana Ronaldu?'
+2026-04-19 14:05:52,881 INFO httpx: HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-19 14:05:52,884 INFO server.governing_loop: Loop [7/12] Intent: UNCLEAR (llm)
+2026-04-19 14:05:54,316 INFO httpx: HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-19 14:05:54,318 INFO server.governing_loop: Loop [8/12] LLM response generated (78 chars)
+2026-04-19 14:05:54,318 INFO server.governing_loop: Loop [12/12] Response: "Your question is unclear. Can you please clarify who or what you're comparing?"
+2026-04-19 14:05:54,438 INFO server.session.manager: Session state: intent_resolved -> session_active
+2026-04-19 14:05:54,438 INFO server.session.manager: Session state: session_active -> listening
+2026-04-19 14:05:54,438 INFO faster_whisper: Processing audio with duration 00:02.304
+2026-04-19 14:05:54,443 INFO faster_whisper: VAD filter removed 00:02.304 of audio
+2026-04-19 14:06:01,150 INFO faster_whisper: Processing audio with duration 00:03.072
+2026-04-19 14:06:01,164 INFO faster_whisper: VAD filter removed 00:01.536 of audio
+2026-04-19 14:06:01,436 INFO server.session.manager: Session state: listening -> processing
+2026-04-19 14:06:01,436 INFO server.session.manager: Session state: processing -> intent_resolved
+2026-04-19 14:06:01,436 INFO server.governing_loop: Loop [1/12] Input: 'in the session.'
+2026-04-19 14:06:02,826 INFO httpx: HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-19 14:06:02,827 INFO server.governing_loop: Loop [7/12] Intent: UNCLEAR (llm)
+2026-04-19 14:06:04,454 INFO httpx: HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-19 14:06:04,456 INFO server.governing_loop: Loop [8/12] LLM response generated (89 chars)
+2026-04-19 14:06:04,457 INFO server.governing_loop: Loop [12/12] Response: 'I\'m not sure what you mean by "in the session." Can you clarify what you\'re refe'
+2026-04-19 14:06:04,599 INFO server.session.manager: Session state: intent_resolved -> session_active
+2026-04-19 14:06:04,599 INFO server.session.manager: Session state: session_active -> listening
+2026-04-19 14:06:05,808 INFO server.session.manager: Session state: listening -> processing
+2026-04-19 14:06:05,809 INFO server.session.manager: Session state: processing -> intent_resolved
+2026-04-19 14:06:05,809 INFO server.governing_loop: Loop [1/12] Input: 'Terminate the session'
+2026-04-19 14:06:07,449 INFO httpx: HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-19 14:06:07,452 INFO server.governing_loop: Loop [7/12] Intent: END_SESSION (llm)
+2026-04-19 14:06:07,453 INFO server.governing_loop: Loop [8/12] Using canned response
+2026-04-19 14:06:07,453 INFO server.session.manager: Session state: intent_resolved -> session_active
+2026-04-19 14:06:07,453 INFO server.session.manager: Session state: session_active -> completing
+2026-04-19 14:06:07,455 INFO server.session.manager: Session state: completing -> completed
+2026-04-19 14:06:07,455 INFO server.session.manager: Session state: completed -> idle
+2026-04-19 14:06:10,247 INFO httpx: HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-19 14:06:10,251 INFO server.governing_loop: Loop [11/12] Session summary stored (3 interactions distilled)
+2026-04-19 14:06:10,251 INFO server.governing_loop: Loop [12/12] Response: 'You moved something forward. Take a pause.'
+INFO:     127.0.0.1:57812 - "GET /api/timeline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57812 - "GET /api/sessions/36936bf8-d76d-401e-badc-838c56fae2cc HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [23074]
