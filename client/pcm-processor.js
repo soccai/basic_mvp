@@ -1,7 +1,8 @@
 class PCMProcessor extends AudioWorkletProcessor {
     constructor() {
         super();
-        this.bufferSize = 4096;
+        // Smaller packets reduce end-of-speech latency without flooding the socket.
+        this.bufferSize = 2048;
         this.buffer = new Float32Array(this.bufferSize);
         this.bufferIndex = 0;
     }

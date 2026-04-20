@@ -36,3 +36,12 @@ async def get_state(request: Request):
     }
     logger.debug("GET /api/state -> %s", payload)
     return payload
+
+
+@router.get("/system-session")
+async def get_system_session(request: Request):
+    gate = request.app.state.connection_gate
+    return {
+        "active": gate.active_token is not None,
+        "connection_token": gate.active_token,
+    }

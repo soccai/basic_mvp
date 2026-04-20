@@ -7,9 +7,20 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Rejection Overlay (shown when another tab is connected) -->
+    <div id="rejection-overlay" class="hidden">
+        <div class="rejection-content">
+            <h1 class="logo">LifeOS</h1>
+            <p class="rejection-message">Another tab is already connected.</p>
+            <p class="rejection-hint">Only one session can be active at a time.</p>
+            <button id="retry-connection">Retry</button>
+        </div>
+    </div>
+
     <!-- Home / Idle View -->
     <div id="home-view">
         <h1 class="logo">LifeOS</h1>
+        <p id="connection-id" class="connection-id"></p>
         <p id="status-text">What do you want to move forward right now?</p>
         <div class="controls">
             <button id="mic-button" aria-label="Start recording">

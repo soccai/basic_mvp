@@ -26,16 +26,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     const listeningIndicator = document.getElementById("listening-indicator");
     const sessionMicButton = document.getElementById("session-mic-button");
     const sessionTextInput = document.getElementById("session-text");
+    const connectionIdEl = document.getElementById("connection-id");
+    const rejectionOverlay = document.getElementById("rejection-overlay");
+    const retryButton = document.getElementById("retry-connection");
 
     function setSpeaking(value) {
         isSpeaking = value;
-        voiceCapture.recording = !value && (uiState === "listening" || uiState === "session");
         if (value) {
+            // AI is speaking: stop recording and disable mic buttons
+            voiceCapture.recording = false;
             micButton.classList.add("disabled");
             sessionMicButton.classList.add("disabled");
+            sessionMicButton.classList.remove("active");
         } else {
+            // AI done speaking: re-enable mic buttons but do NOT auto-record.
+            // User must click the mic to start recording.
             micButton.classList.remove("disabled");
             sessionMicButton.classList.remove("disabled");
+            // In listening mode (home screen), resume recording since user
+            // explicitly opened the mic and is waiting to speak
+            if (uiState === "listening") {
+                voiceCapture.recording = true;
+            }
         }
     }
 
@@ -58,6 +70,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     async function speakText(text, onEnd) {
+        // Stop any currently playing audio to prevent overlap
+        audioPlayer.stopCurrent();
         setSpeaking(true);
         try {
             const resp = await fetch("/api/tts", {
@@ -155,6 +169,25 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     wsClient.connect();
 
+    // Connection gate events
+    wsClient.on("connection_accepted", (msg) => {
+        connectionIdEl.textContent = `Session: ${msg.connection_token.slice(0, 8)}`;
+        rejectionOverlay.classList.add("hidden");
+        document.getElementById("home-view").classList.remove("hidden");
+    });
+
+    wsClient.on("connection_rejected", (msg) => {
+        rejectionOverlay.classList.remove("hidden");
+        document.getElementById("home-view").classList.add("hidden");
+        micButton.classList.add("disabled");
+    });
+
+    retryButton.addEventListener("click", () => {
+        sessionStorage.removeItem("lifeos_connection_token");
+        wsClient.rejected = false;
+        wsClient.connect();
+    });
+
     // Mic button (home screen)
     micButton.addEventListener("click", async () => {
         if (isSpeaking) return;
@@ -234,6 +267,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     wsClient.on("disconnected", () => {
+        if (wsClient.rejected) {
+            // Rejected by connection gate — show overlay, don't show "Reconnecting"
+            rejectionOverlay.classList.remove("hidden");
+            document.getElementById("home-view").classList.add("hidden");
+            return;
+        }
         if (uiState === "session") {
             sessionSurface.showInterrupted();
         }
@@ -276,15 +315,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         clearNudgeTimer();
         micButton.classList.remove("active");
         listeningIndicator.classList.add("hidden");
+        // Stop any ongoing recording — user must click mic to talk
+        voiceCapture.recording = false;
         // Delay surface open so "Starting your session" TTS plays first
-        setTimeout(async () => {
+        setTimeout(() => {
             sessionSurface.show(msg.session_id, msg.intent_transcript);
-            // Auto-start voice capture so the user can keep talking
-            if (!voiceCapture.stream) {
-                await voiceCapture.start();
-            }
-            voiceCapture.recording = true;
-            sessionMicButton.classList.add("active");
+            // Mic starts disabled — user clicks session mic button to record
+            sessionMicButton.classList.remove("active");
         }, 600);
     });
 

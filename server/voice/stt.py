@@ -46,10 +46,7 @@ class STTAdapter:
                 audio,
                 beam_size=config.WHISPER_BEAM_SIZE,
                 language="en",
-                vad_filter=True,
-                vad_parameters=dict(
-                    min_silence_duration_ms=config.VAD_MIN_SILENCE_MS,
-                ),
+                vad_filter=False,
             )
             transcript = " ".join(seg.text for seg in segments).strip()
             logger.debug("STT transcribe completed: %d chars", len(transcript))

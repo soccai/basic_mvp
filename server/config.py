@@ -23,12 +23,19 @@ STT_SAMPLE_RATE = 16000
 AUDIO_CHANNELS = 1
 
 # VAD
-VAD_MIN_SILENCE_MS = 500
-VAD_ENERGY_THRESHOLD = 0.01
+VAD_MIN_SILENCE_MS = 800           # wait 0.8s of silence before treating speech as finished
+VAD_ENERGY_THRESHOLD = 0.015
+VAD_MIN_SPEECH_MS = 600            # ignore utterances shorter than 600ms (fragments)
 
 # Session
-SESSION_INTERRUPT_TIMEOUT_SECONDS = 300
+SESSION_INTERRUPT_TIMEOUT_SECONDS = 500
 SESSION_TYPE_DEFAULT = "focus"
+
+# Connection gate
+CONNECTION_GRACE_PERIOD_SECONDS = int(os.environ.get("LIFEOS_CONNECTION_GRACE_SECONDS", "10"))
+
+# LLM provider (ollama, openai, anthropic — only ollama implemented for now)
+LLM_PROVIDER = os.environ.get("LIFEOS_LLM_PROVIDER", "ollama")
 
 # Ollama (optional)
 OLLAMA_BASE_URL = os.environ.get("LIFEOS_OLLAMA_BASE_URL", "http://localhost:11434")
@@ -46,3 +53,7 @@ LOG_LEVEL = os.environ.get("LIFEOS_LOG_LEVEL", "INFO")
 def ensure_dirs():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+#Quest/Exploration/Discovery/Journey
+#Mission/Challenge/Experience

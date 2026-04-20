@@ -67,9 +67,10 @@ async def execute_governing_loop(
     ctx.identity = await verify_identity()
     logger.debug("Loop [3/12] Identity: %s", ctx.identity)
 
-    # Step 4: Memory retrieved (stub)
-    ctx.memory = {}
-    logger.debug("Loop [4/12] Memory: (stub, empty)")
+    # Step 4: Memory retrieved — pull recent session summaries for continuity
+    recent_summaries = await event_store.get_recent_summaries(limit=3)
+    ctx.memory = {"recent_sessions": recent_summaries}
+    logger.debug("Loop [4/12] Memory: %d recent session summaries", len(recent_summaries))
 
     # Step 5: Context evaluated
     ctx.context = {
@@ -100,8 +101,13 @@ async def execute_governing_loop(
             response_text="",
         )
     else:
+        routing_state = (
+            SessionState.SESSION_ACTIVE.value
+            if session_manager.active_session
+            else session_manager.state.value
+        )
         ctx.intent_result = await intent_router.classify(
-            transcript, session_manager.state.value
+            transcript, routing_state
         )
     logger.info("Loop [7/12] Intent: %s (%s)",
                 ctx.intent_result.intent.value, ctx.intent_result.method)
@@ -121,10 +127,12 @@ async def execute_governing_loop(
     # Inside a session: route all non-lifecycle intents through the LLM so
     # the user can have natural conversation, not just canned replies.
     _lifecycle_intents = {Intent.START_SESSION, Intent.END_SESSION}
+    _canned_only_intents = {Intent.READ_EMAIL, Intent.REQUEST_FINANCE}
     if (
         llm_responder
         and session_manager.active_session
         and ctx.intent_result.intent not in _lifecycle_intents
+        and ctx.intent_result.intent not in _canned_only_intents
     ):
         logger.debug("Loop [8/12] Requesting LLM response (intent=%s, state=%s)",
                      ctx.intent_result.intent.value, session_manager.state.value)
@@ -133,9 +141,14 @@ async def execute_governing_loop(
             intent=ctx.intent_result.intent.value,
             session_state=session_manager.state.value,
             context=ctx.context,
+            conversation_history=list(session_manager.active_session.interactions),
+            memory=ctx.memory,
         )
         if generated:
             ctx.response_text = generated
+            # Store LLM response in the ephemeral interaction for multi-turn context
+            if session_manager.active_session and session_manager.active_session.interactions:
+                session_manager.active_session.interactions[-1]["response"] = generated
             logger.info("Loop [8/12] LLM response generated (%d chars)", len(generated))
         else:
             logger.debug("Loop [8/12] LLM returned nothing — will use canned")

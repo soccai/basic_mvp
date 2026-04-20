@@ -10,6 +10,7 @@ class Intent(str, Enum):
     END_SESSION = "END_SESSION"
     REQUEST_GUIDANCE = "REQUEST_GUIDANCE"
     REQUEST_FINANCE = "REQUEST_FINANCE"
+    READ_EMAIL = "READ_EMAIL"
     UNCLEAR = "UNCLEAR"
 
 
@@ -29,13 +30,13 @@ KEYWORD_PATTERNS: list[tuple[list[str], Intent]] = [
     # END_SESSION — multi-word first
     (
         [
-            "end session", "finish session",
+            "end session", "finish session", "terminate session",
             "im done", "i'm done", "i am done",
             "session done", "stop session",
         ],
         Intent.END_SESSION,
     ),
-    (["done", "finish", "end", "stop", "complete"], Intent.END_SESSION),
+    (["finish", "end", "terminate", "stop"], Intent.END_SESSION),
     # REQUEST_FINANCE — must be before guidance to catch "i need" patterns
     (
         [
@@ -46,6 +47,20 @@ KEYWORD_PATTERNS: list[tuple[list[str], Intent]] = [
             "i need 100",
         ],
         Intent.REQUEST_FINANCE,
+    ),
+    # READ_EMAIL
+    (
+        [
+            "check my email", "check my emails", "check email", "check emails",
+            "read my email", "read my emails", "read email", "read emails",
+            "any new emails", "any new email", "any emails",
+            "show my emails", "show my email", "show emails",
+            "do i have emails", "do i have email",
+            "open my email", "open email", "open emails",
+            "email me", "my emails", "my email",
+            "whats in my inbox", "what's in my inbox", "check inbox",
+        ],
+        Intent.READ_EMAIL,
     ),
     # REQUEST_GUIDANCE
     (

@@ -36,6 +36,25 @@ async def websocket_handler(websocket: WebSocket):
     intent_router = getattr(app.state, "intent_router", None)
     event_store = getattr(app.state, "event_store", None)
     llm_responder = getattr(app.state, "llm_responder", None)
+    connection_gate = getattr(app.state, "connection_gate", None)
+
+    # --- Connection gate: enforce single-connection ---
+    if connection_gate:
+        client_token = websocket.query_params.get("token")
+        accepted, token, reason = await connection_gate.try_acquire(
+            client_token, websocket
+        )
+        if not accepted:
+            await websocket.send_json({
+                "type": "connection_rejected",
+                "reason": reason,
+            })
+            await websocket.close(code=4409)
+            return
+        await websocket.send_json({
+            "type": "connection_accepted",
+            "connection_token": token,
+        })
 
     try:
         # If a session was interrupted, resume it
@@ -82,6 +101,13 @@ async def websocket_handler(websocket: WebSocket):
                         SessionState.IDLE, SessionState.SESSION_ACTIVE,
                     ):
                         session_manager.transition(SessionState.LISTENING)
+
+                # Fragment too short — discard buffer and keep listening
+                if vad_result == "discard":
+                    logger.debug("VAD: discarded short fragment, clearing buffer")
+                    state.audio_buffer = bytearray()
+                    state.speech_started = False
+                    continue
 
                 if vad_result == "speech_end" and len(state.audio_buffer) > 0:
                     logger.debug("VAD: speech_end — buffer %d bytes, starting STT",
@@ -174,6 +200,8 @@ async def websocket_handler(websocket: WebSocket):
 
     except WebSocketDisconnect:
         logger.debug("WS disconnected (state=%s)", session_manager.state.value if session_manager else "n/a")
+        if connection_gate:
+            await connection_gate.release()
         if session_manager:
             await session_manager.handle_disconnect()
     except Exception as e:
@@ -186,6 +214,8 @@ async def websocket_handler(websocket: WebSocket):
             await websocket.close(code=1011)
         except Exception:
             pass  # Client may already be disconnected
+        if connection_gate:
+            await connection_gate.release()
         if session_manager:
             await session_manager.handle_disconnect()
 

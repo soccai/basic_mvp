@@ -16,6 +16,7 @@ from server.intent.ollama import OllamaClient
 from server.llm.responder import LLMResponder
 from server.routes import health, timeline, sessions, tts
 from server.ws.handler import websocket_handler
+from server.ws.connection_gate import ConnectionGate
 
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL.upper(), logging.INFO),
@@ -52,6 +53,9 @@ async def lifespan(app: FastAPI):
     # Init session manager
     app.state.session_manager = SessionManager(event_store)
 
+    # Init connection gate (single-connection enforcement)
+    app.state.connection_gate = ConnectionGate()
+
     # Init intent router with optional Ollama
     ollama = OllamaClient()
     await ollama.check_availability()
@@ -72,6 +76,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    await app.state.connection_gate.shutdown()
     await app.state.session_manager.shutdown()
     await event_store.close()
 

@@ -24,7 +24,7 @@ def test_guidance_prompt_response():
 
 def test_end_session_response():
     router = IntentRouter()
-    assert router._get_response(Intent.END_SESSION, "session_active") == "Session complete. You moved something forward."
+    assert router._get_response(Intent.END_SESSION, "session_active") == "You moved something forward. Take a pause."
 
 
 @pytest.mark.asyncio
