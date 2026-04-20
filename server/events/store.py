@@ -171,7 +171,7 @@ class EventStore:
 
     async def get_sessions(self) -> list[dict]:
         cursor = await self.db.execute(
-            "SELECT session_id, status, session_type, started_at, completed_at, duration_ms FROM sessions ORDER BY started_at DESC"
+            "SELECT session_id, status, session_type, started_at, completed_at, duration_ms, summary FROM sessions ORDER BY started_at DESC"
         )
         rows = await cursor.fetchall()
         columns = [desc[0] for desc in cursor.description]
@@ -191,6 +191,21 @@ class EventStore:
         session = dict(zip(columns, row))
         logger.debug("Loaded session %s", session_id)
         return session
+
+    async def get_recent_summaries(self, limit: int = 3) -> list[dict]:
+        """Retrieve the N most recent completed session summaries."""
+        cursor = await self.db.execute(
+            "SELECT session_id, session_type, started_at, summary "
+            "FROM sessions "
+            "WHERE status = 'completed' AND summary IS NOT NULL "
+            "ORDER BY started_at DESC LIMIT ?",
+            (limit,),
+        )
+        rows = await cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description]
+        result = [dict(zip(columns, row)) for row in rows]
+        logger.debug("Loaded recent summaries: %d", len(result))
+        return result
 
     async def update_session_summary(self, session_id: str, summary: str):
         logger.debug("Updating session summary for %s (%d chars)", session_id, len(summary))

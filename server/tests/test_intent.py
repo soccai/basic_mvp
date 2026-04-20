@@ -1,4 +1,7 @@
+import pytest
+
 from server.intent.keywords import Intent, keyword_match, normalize
+from server.intent.router import IntentRouter
 
 
 def test_start_variants():
@@ -62,3 +65,37 @@ def test_word_boundary_no_false_positives():
     assert keyword_match("I already did it") is None
     assert keyword_match("that task is incomplete") is None
     assert keyword_match("I already finished that") is None
+
+
+class StubOllama:
+    def __init__(self, intent: Intent | None):
+        self.intent = intent
+        self.calls = 0
+
+    async def classify(self, transcript: str) -> Intent | None:
+        self.calls += 1
+        return self.intent
+
+
+@pytest.mark.asyncio
+async def test_active_session_defaults_to_guidance_without_llm():
+    ollama = StubOllama(Intent.START_SESSION)
+    router = IntentRouter(ollama_client=ollama)
+
+    result = await router.classify("banana", "session_active")
+
+    assert result.intent == Intent.REQUEST_GUIDANCE
+    assert result.method == "session_default"
+    assert ollama.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_idle_transcript_still_uses_llm_fallback():
+    ollama = StubOllama(Intent.UNCLEAR)
+    router = IntentRouter(ollama_client=ollama)
+
+    result = await router.classify("banana", "idle")
+
+    assert result.intent == Intent.UNCLEAR
+    assert result.method == "llm"
+    assert ollama.calls == 1

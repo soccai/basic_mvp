@@ -22,7 +22,13 @@ class IntentRouter:
         intent = keyword_match(transcript)
         method = "keyword"
 
-        if intent is None and self.ollama:
+        # During an active session, most free-form turns are conversation, not
+        # lifecycle commands. Skip the extra classifier call unless a keyword
+        # already matched a specific intent.
+        if intent is None and current_state == "session_active":
+            intent = Intent.REQUEST_GUIDANCE
+            method = "session_default"
+        elif intent is None and self.ollama:
             logger.debug("No keyword match — trying Ollama fallback")
             intent = await self.ollama.classify(transcript)
             method = "llm" if intent else "keyword"
@@ -54,6 +60,12 @@ class IntentRouter:
             if state == "session_active":
                 return "You're in an active session. Say done when you're finished."
             return "What do you want to move forward right now?"
+        elif intent == Intent.READ_EMAIL:
+            return (
+                "I don't have access to your emails yet, but here's how I would help. "
+                "Once connected, I can read your unread messages, summarize them, "
+                "and let you reply by voice. For now, you can check your inbox directly."
+            )
         elif intent == Intent.REQUEST_FINANCE:
             return "Finance features are not available yet."
         else:

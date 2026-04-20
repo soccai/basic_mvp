@@ -23,12 +23,15 @@ STT_SAMPLE_RATE = 16000
 AUDIO_CHANNELS = 1
 
 # VAD
-VAD_MIN_SILENCE_MS = 500
-VAD_ENERGY_THRESHOLD = 0.01
+VAD_MIN_SILENCE_MS = 300
+VAD_ENERGY_THRESHOLD = 0.015
 
 # Session
 SESSION_INTERRUPT_TIMEOUT_SECONDS = 300
 SESSION_TYPE_DEFAULT = "focus"
+
+# LLM provider (ollama, openai, anthropic — only ollama implemented for now)
+LLM_PROVIDER = os.environ.get("LIFEOS_LLM_PROVIDER", "ollama")
 
 # Ollama (optional)
 OLLAMA_BASE_URL = os.environ.get("LIFEOS_OLLAMA_BASE_URL", "http://localhost:11434")
