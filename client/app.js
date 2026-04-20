@@ -29,13 +29,22 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     function setSpeaking(value) {
         isSpeaking = value;
-        voiceCapture.recording = !value && (uiState === "listening" || uiState === "session");
         if (value) {
+            // AI is speaking: stop recording and disable mic buttons
+            voiceCapture.recording = false;
             micButton.classList.add("disabled");
             sessionMicButton.classList.add("disabled");
+            sessionMicButton.classList.remove("active");
         } else {
+            // AI done speaking: re-enable mic buttons but do NOT auto-record.
+            // User must click the mic to start recording.
             micButton.classList.remove("disabled");
             sessionMicButton.classList.remove("disabled");
+            // In listening mode (home screen), resume recording since user
+            // explicitly opened the mic and is waiting to speak
+            if (uiState === "listening") {
+                voiceCapture.recording = true;
+            }
         }
     }
 
@@ -58,6 +67,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     async function speakText(text, onEnd) {
+        // Stop any currently playing audio to prevent overlap
+        audioPlayer.stopCurrent();
         setSpeaking(true);
         try {
             const resp = await fetch("/api/tts", {
@@ -276,15 +287,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         clearNudgeTimer();
         micButton.classList.remove("active");
         listeningIndicator.classList.add("hidden");
+        // Stop any ongoing recording — user must click mic to talk
+        voiceCapture.recording = false;
         // Delay surface open so "Starting your session" TTS plays first
-        setTimeout(async () => {
+        setTimeout(() => {
             sessionSurface.show(msg.session_id, msg.intent_transcript);
-            // Auto-start voice capture so the user can keep talking
-            if (!voiceCapture.stream) {
-                await voiceCapture.start();
-            }
-            voiceCapture.recording = true;
-            sessionMicButton.classList.add("active");
+            // Mic starts disabled — user clicks session mic button to record
+            sessionMicButton.classList.remove("active");
         }, 600);
     });
 

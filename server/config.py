@@ -23,11 +23,12 @@ STT_SAMPLE_RATE = 16000
 AUDIO_CHANNELS = 1
 
 # VAD
-VAD_MIN_SILENCE_MS = 300
+VAD_MIN_SILENCE_MS = 1500          # wait 1.5s of silence before treating speech as finished
 VAD_ENERGY_THRESHOLD = 0.015
+VAD_MIN_SPEECH_MS = 600            # ignore utterances shorter than 600ms (fragments)
 
 # Session
-SESSION_INTERRUPT_TIMEOUT_SECONDS = 300
+SESSION_INTERRUPT_TIMEOUT_SECONDS = 500
 SESSION_TYPE_DEFAULT = "focus"
 
 # LLM provider (ollama, openai, anthropic — only ollama implemented for now)
@@ -49,3 +50,7 @@ LOG_LEVEL = os.environ.get("LIFEOS_LOG_LEVEL", "INFO")
 def ensure_dirs():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+#Quest/Exploration/Discovery/Journey
+#Mission/Challenge/Experience

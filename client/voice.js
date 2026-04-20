@@ -62,6 +62,7 @@ class VoiceCapture {
 class AudioPlayer {
     constructor() {
         this.audioContext = null;
+        this._currentSource = null;
     }
 
     _ensureContext() {
@@ -71,7 +72,21 @@ class AudioPlayer {
         return this.audioContext;
     }
 
+    /** Stop any audio currently playing */
+    stopCurrent() {
+        if (this._currentSource) {
+            try { this._currentSource.stop(); } catch {}
+            this._currentSource = null;
+        }
+        // Also cancel browser speech synthesis if active
+        if ("speechSynthesis" in window) {
+            speechSynthesis.cancel();
+        }
+    }
+
     async playWAV(arrayBuffer) {
+        // Stop any previous playback to prevent overlapping voices
+        this.stopCurrent();
         try {
             const ctx = this._ensureContext();
             if (ctx.state === "suspended") await ctx.resume();
@@ -79,11 +94,16 @@ class AudioPlayer {
             const source = ctx.createBufferSource();
             source.buffer = audioBuffer;
             source.connect(ctx.destination);
+            this._currentSource = source;
             source.start();
             return new Promise((resolve) => {
-                source.onended = resolve;
+                source.onended = () => {
+                    this._currentSource = null;
+                    resolve();
+                };
             });
         } catch (e) {
+            this._currentSource = null;
             console.error("Audio playback failed:", e);
         }
     }

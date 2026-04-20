@@ -83,6 +83,13 @@ async def websocket_handler(websocket: WebSocket):
                     ):
                         session_manager.transition(SessionState.LISTENING)
 
+                # Fragment too short — discard buffer and keep listening
+                if vad_result == "discard":
+                    logger.debug("VAD: discarded short fragment, clearing buffer")
+                    state.audio_buffer = bytearray()
+                    state.speech_started = False
+                    continue
+
                 if vad_result == "speech_end" and len(state.audio_buffer) > 0:
                     logger.debug("VAD: speech_end — buffer %d bytes, starting STT",
                                  len(state.audio_buffer))

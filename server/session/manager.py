@@ -64,6 +64,13 @@ class SessionManager:
     async def start_session(self, transcript: str) -> SessionRecord:
         async with self._lock:
             logger.debug("start_session: acquiring lock (state=%s)", self.state.value)
+
+            # Only one session may be active at a time
+            if self.active_session is not None:
+                logger.warning("start_session rejected — session %s already active",
+                               self.active_session.session_id)
+                raise InvalidTransition("A session is already active")
+
             now = datetime.now(timezone.utc).isoformat()
             session = SessionRecord(
                 session_id=str(uuid.uuid4()),
