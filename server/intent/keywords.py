@@ -11,6 +11,7 @@ class Intent(str, Enum):
     REQUEST_GUIDANCE = "REQUEST_GUIDANCE"
     REQUEST_FINANCE = "REQUEST_FINANCE"
     READ_EMAIL = "READ_EMAIL"
+    CONVERSATION = "CONVERSATION"
     UNCLEAR = "UNCLEAR"
 
 
@@ -62,6 +63,21 @@ KEYWORD_PATTERNS: list[tuple[list[str], Intent]] = [
         ],
         Intent.READ_EMAIL,
     ),
+    # CONVERSATION — greetings and casual chat
+    (
+        [
+            "good morning", "good afternoon", "good evening", "good night",
+            "how are you", "how is your day", "how's your day",
+            "how are things", "how's it going", "hows it going",
+            "whats up", "what's up",
+            "hey there", "hi there", "hello there",
+            "thank you", "thanks a lot",
+            "have a good day", "have a nice day",
+            "nice to see you", "nice talking",
+        ],
+        Intent.CONVERSATION,
+    ),
+    (["hello", "hi", "hey", "morning", "evening", "yo", "sup", "thanks"], Intent.CONVERSATION),
     # REQUEST_GUIDANCE
     (
         [
@@ -89,6 +105,9 @@ def keyword_match(transcript: str) -> Intent | None:
     logger.debug("Keyword match — normalized: %r", normalized)
     if not normalized:
         return None
+        
+    word_count = len(normalized.split())
+    
     for patterns, intent in KEYWORD_PATTERNS:
         for pattern in patterns:
             if " " in pattern:
@@ -97,10 +116,10 @@ def keyword_match(transcript: str) -> Intent | None:
                     logger.debug("Keyword matched: %r → %s (multi-word)", pattern, intent.value)
                     return intent
             else:
-                # Single-word patterns: require word boundaries to prevent
-                # false positives (e.g., "end" matching "understand")
-                if re.search(r'\b' + re.escape(pattern) + r'\b', normalized):
-                    logger.debug("Keyword matched: %r → %s (word-boundary)", pattern, intent.value)
+                # Single-word patterns: require word boundaries AND short sentence length
+                # (< 6 words) to prevent aggressive false positives during conversation.
+                if word_count <= 5 and re.search(r'\b' + re.escape(pattern) + r'\b', normalized):
+                    logger.debug("Keyword matched: %r → %s (word-boundary, short-text)", pattern, intent.value)
                     return intent
     logger.debug("No keyword match for: %r", normalized)
     return None

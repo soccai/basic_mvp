@@ -37,8 +37,9 @@ class ConnectionGate:
         Returns (accepted, token, rejection_reason).
         """
         async with self._lock:
-            # Cancel any pending grace-period expiry
-            if self._grace_task and not self._grace_task.done():
+            # If grace period is running, the previous tab is gone
+            in_grace = self._grace_task and not self._grace_task.done()
+            if in_grace:
                 self._grace_task.cancel()
                 self._grace_task = None
 
@@ -56,7 +57,15 @@ class ConnectionGate:
                 logger.info("Reconnect accepted — token %s", token[:8])
                 return True, token, ""
 
-            # Different token or no token — reject
+            # Grace period was active — previous tab disconnected, accept new client
+            if in_grace:
+                new_token = token if token else str(uuid.uuid4())
+                self._active_token = new_token
+                self._websocket = websocket
+                logger.info("Connection accepted (previous tab gone) — token %s", new_token[:8])
+                return True, new_token, ""
+
+            # Active connection still live — reject
             logger.info(
                 "Connection rejected — active token %s, offered %s",
                 self._active_token[:8],

@@ -16,9 +16,10 @@ def test_start_variants():
 def test_end_variants():
     assert keyword_match("I'm done") == Intent.END_SESSION
     assert keyword_match("finish") == Intent.END_SESSION
-    assert keyword_match("done") == Intent.END_SESSION
+    assert keyword_match("done") is None  # "done" alone is too ambiguous
     assert keyword_match("end session") == Intent.END_SESSION
     assert keyword_match("stop") == Intent.END_SESSION
+    assert keyword_match("terminate") == Intent.END_SESSION
 
 
 def test_guidance_variants():
@@ -65,6 +66,31 @@ def test_word_boundary_no_false_positives():
     assert keyword_match("I already did it") is None
     assert keyword_match("that task is incomplete") is None
     assert keyword_match("I already finished that") is None
+
+
+def test_conversation_greetings():
+    assert keyword_match("good morning") == Intent.CONVERSATION
+    assert keyword_match("good afternoon") == Intent.CONVERSATION
+    assert keyword_match("good evening") == Intent.CONVERSATION
+    assert keyword_match("good night") == Intent.CONVERSATION
+    assert keyword_match("hello") == Intent.CONVERSATION
+    assert keyword_match("hi") == Intent.CONVERSATION
+    assert keyword_match("hey") == Intent.CONVERSATION
+    assert keyword_match("how are you") == Intent.CONVERSATION
+    assert keyword_match("how's your day") == Intent.CONVERSATION
+    assert keyword_match("thanks") == Intent.CONVERSATION
+    assert keyword_match("thank you") == Intent.CONVERSATION
+    assert keyword_match("morning") == Intent.CONVERSATION
+    assert keyword_match("yo") == Intent.CONVERSATION
+
+
+def test_conversation_does_not_override_intents():
+    """Greetings must not collide with more specific intents."""
+    assert keyword_match("start session") == Intent.START_SESSION
+    assert keyword_match("end session") == Intent.END_SESSION
+    assert keyword_match("help") == Intent.REQUEST_GUIDANCE
+    assert keyword_match("ready") == Intent.START_SESSION
+    assert keyword_match("stop") == Intent.END_SESSION
 
 
 class StubOllama:

@@ -5,9 +5,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     let nudgeTimer = null;
     let idleResetTimer = null;
 
-    const GUIDE_PROMPT = "What do you want to move forward right now?";
-    const GUIDE_NUDGE = "You can say 'start session' when you're ready.";
-    const SESSION_COMPLETE_TEXT = "You moved something forward.";
+    const IDLE_PROMPTS = [
+        "You have 3 priorities pending today.",
+        "Your day is synced. Calendar, messages, tasks ready.",
+        "What do you want to move forward right now?",
+    ];
+    let currentGuidePrompt = IDLE_PROMPTS[0];
+
+    const GUIDE_NUDGE = "Say 'start' when you're ready.";
+    const SESSION_COMPLETE_TEXT = "Done. Take a beat.";
 
     const wsUrl = `ws://${location.host}/ws`;
     const wsClient = new WebSocketClient(wsUrl);
@@ -39,14 +45,19 @@ document.addEventListener("DOMContentLoaded", async () => {
             sessionMicButton.classList.add("disabled");
             sessionMicButton.classList.remove("active");
         } else {
-            // AI done speaking: re-enable mic buttons but do NOT auto-record.
-            // User must click the mic to start recording.
+            // AI done speaking: re-enable mic buttons.
             micButton.classList.remove("disabled");
             sessionMicButton.classList.remove("disabled");
-            // In listening mode (home screen), resume recording since user
-            // explicitly opened the mic and is waiting to speak
-            if (uiState === "listening") {
+            
+            // Auto-resume listening for natural, hands-free conversation flow
+            if (uiState === "session") {
                 voiceCapture.recording = true;
+                sessionMicButton.classList.add("active");
+            } else if (uiState === "listening") {
+                voiceCapture.recording = true;
+                micButton.classList.add("active");
+                listeningIndicator.classList.remove("hidden");
+                beginListeningPrompt();
             }
         }
     }
@@ -66,7 +77,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function setIdlePrompt() {
-        statusText.textContent = GUIDE_PROMPT;
+        currentGuidePrompt = IDLE_PROMPTS[Math.floor(Math.random() * IDLE_PROMPTS.length)];
+        statusText.textContent = currentGuidePrompt;
     }
 
     async function speakText(text, onEnd) {
@@ -109,7 +121,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // time). Give them space to start talking. The nudge timer will voice the
     // prompt after 5 s of silence so they know the system is ready.
     async function beginListeningPrompt() {
-        statusText.textContent = GUIDE_PROMPT;
+        statusText.textContent = "Listening...";
         // Do NOT auto-speak here — just show the text and wait.
         if (uiState !== "listening") return;
 
@@ -130,8 +142,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         clearNudgeTimer();
         nudgeTimer = setTimeout(async () => {
             if (uiState === "listening" && !isSpeaking) {
-                statusText.textContent = GUIDE_PROMPT;
-                await speakText(GUIDE_PROMPT);
+                statusText.textContent = currentGuidePrompt;
+                await speakText(currentGuidePrompt);
                 // Secondary nudge after another 5 s if still silent
                 if (uiState === "listening" && !isSpeaking) {
                     statusText.textContent = GUIDE_NUDGE;

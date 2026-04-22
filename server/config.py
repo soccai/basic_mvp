@@ -25,10 +25,10 @@ AUDIO_CHANNELS = 1
 # VAD
 VAD_MIN_SILENCE_MS = 800           # wait 0.8s of silence before treating speech as finished
 VAD_ENERGY_THRESHOLD = 0.015
-VAD_MIN_SPEECH_MS = 600            # ignore utterances shorter than 600ms (fragments)
+VAD_MIN_SPEECH_MS = 200            # ignore utterances shorter than 200ms (fragments)
 
 # Session
-SESSION_INTERRUPT_TIMEOUT_SECONDS = 500
+SESSION_INTERRUPT_TIMEOUT_SECONDS = 30
 SESSION_TYPE_DEFAULT = "focus"
 
 # Connection gate
@@ -39,10 +39,14 @@ LLM_PROVIDER = os.environ.get("LIFEOS_LLM_PROVIDER", "ollama")
 
 # Ollama (optional)
 OLLAMA_BASE_URL = os.environ.get("LIFEOS_OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("LIFEOS_OLLAMA_MODEL", "llama3.1:8b")
+OLLAMA_MODEL = os.environ.get("LIFEOS_OLLAMA_MODEL", "gemma4:e4b")
 OLLAMA_TIMEOUT_SECONDS = 10
-OLLAMA_GENERATE_TIMEOUT_SECONDS = 10
-OLLAMA_SUMMARY_TIMEOUT_SECONDS = 20
+OLLAMA_GENERATE_TIMEOUT_SECONDS = 60   # gemma4 thinking model needs ~5-8s for reasoning alone
+OLLAMA_SUMMARY_TIMEOUT_SECONDS = 90   # summaries are longer; budget accordingly
+
+# Graphiti / Kuzu (embedded graph DB — no external server needed)
+KUZU_DB_PATH = Path(os.environ.get("LIFEOS_KUZU_DB", str(DATA_DIR / "identity.kuzu")))
+GRAPHITI_GROUP_ID = os.environ.get("LIFEOS_GRAPHITI_GROUP_ID", "lifeos_user")
 
 # Server
 HOST = os.environ.get("LIFEOS_HOST", "0.0.0.0")

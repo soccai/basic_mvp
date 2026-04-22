@@ -1,4 +1,5 @@
 import logging
+import random
 from dataclasses import dataclass
 from server.intent.keywords import Intent, keyword_match
 
@@ -22,9 +23,6 @@ class IntentRouter:
         intent = keyword_match(transcript)
         method = "keyword"
 
-        # During an active session, most free-form turns are conversation, not
-        # lifecycle commands. Skip the extra classifier call unless a keyword
-        # already matched a specific intent.
         if intent is None and current_state == "session_active":
             intent = Intent.REQUEST_GUIDANCE
             method = "session_default"
@@ -58,15 +56,26 @@ class IntentRouter:
             return "You moved something forward. Take a pause."
         elif intent == Intent.REQUEST_GUIDANCE:
             if state == "session_active":
-                return "You're in an active session. Say done when you're finished."
-            return "What do you want to move forward right now?"
+                return "I'm listening. Tell me more about what you're working through."
+            return "I'd love to help with that. Start a session and we can dig into it together."
         elif intent == Intent.READ_EMAIL:
-            return (
-                "I don't have access to your emails yet, but here's how I would help. "
-                "Once connected, I can read your unread messages, summarize them, "
-                "and let you reply by voice. For now, you can check your inbox directly."
-            )
+            if state == "session_active":
+                return (
+                    "I don't have access to your emails yet, but here's how I would help. "
+                    "Once connected, I can read your unread messages, summarize them, "
+                    "and let you reply by voice. For now, you can check your inbox directly."
+                )
+            return "I can help with that once we're in a session. Say 'start' when you're ready."
         elif intent == Intent.REQUEST_FINANCE:
-            return "Finance features are not available yet."
+            if state == "session_active":
+                return "Finance features are not available yet."
+            return "I can help with that once we're in a session. Say 'start' when you're ready."
+        elif intent == Intent.CONVERSATION:
+            options = [
+                "You have 3 priorities pending today.",
+                "Your day is synced. Calendar, messages, tasks ready.",
+                "What do you want to move forward right now?",
+            ]
+            return random.choice(options)
         else:
-            return "I didn't catch that. You can say 'start session' or tell me what you want to move forward."
+            return "I can help with that in a session. Say 'start' when you're ready, or just say hi."

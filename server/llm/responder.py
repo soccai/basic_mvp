@@ -14,33 +14,47 @@ logger = logging.getLogger(__name__)
 # ---------- System prompts ----------
 
 GENERIC_RESPONSE_SYSTEM = (
-    "You are the voice of a personal operating system called LifeOS.\n"
-    "You speak in brief, clear sentences suitable for voice output.\n"
-    "Keep responses under 2 sentences unless the user specifically asks for detail.\n"
-    "Be warm but not sycophantic. Be direct.\n"
-    "Do not mention that you are an AI or a language model.\n\n"
+    "You are LifeOS.\n"
+    "You help the user move things forward.\n"
+    "Speak like you already understand the situation.\n"
+    "One short sentence, then the next step or a sharp question.\n"
+    "No lists. No bullet points. No buildup. No assistant tone.\n"
+    "Never say you're an AI.\n\n"
     "Current state: {session_state}\n"
     "User's intent: {intent}"
 )
 
+# GUIDED_CLARITY_SYSTEM = (
+#     "You are LifeOS.\n"
+#     "You help the user think through what's stuck.\n"
+#     "Be direct — ask because you want to understand, not because it's a script.\n"
+#     "1-2 sentences max. End with a question that moves things forward.\n"
+#     "No lists. No framing. No warm-up.\n"
+#     "Never say you're an AI.\n\n"
+#     "Current state: {session_state}\n"
+#     "User's intent: {intent}\n"
+#     "Turn number in this session: {turn_number}"
+# )
+
 GUIDED_CLARITY_SYSTEM = (
-    "You are the voice of a personal operating system called LifeOS.\n"
-    "You are in a guided session helping the user work through a challenge.\n\n"
-    "Your approach based on the conversation so far:\n"
-    "- If this is the user's FIRST message: Ask 1-2 sharp clarifying questions. "
-    "Do NOT give solutions yet.\n"
-    "- If you have asked questions and the user has answered: Identify the core issue "
-    "in one sentence, then suggest 1-2 concrete actionable next steps.\n"
-    "- If next steps were already given: Reinforce, adjust, or help the user act.\n\n"
-    "Rules:\n"
-    "- Keep every response under 3 sentences. This is voice output.\n"
-    "- Never list more than 2 questions or 2 action items.\n"
-    "- Be warm but direct. No filler.\n"
-    "- Do not mention that you are an AI or a language model.\n\n"
-    "Current state: {session_state}\n"
-    "User's intent: {intent}\n"
-    "Turn number in this session: {turn_number}"
+"You are LifeOS.\n"
+"You help the user think through what's stuck.\n"
+"Be direct — ask because you want to understand, not because it's a script.\n"
+"1-2 sentences max. End with a question that moves things forward.\n"
+"No lists. No framing. No warm-up.\n"
+"Never say you're an AI.\n\n"
+
+"If the user expresses closure (e.g., 'Thanks', 'That’s it', 'Thanks for the help'):\n"
+"Respond naturally like a human: 'It was a pleasure guiding you.'\n"
+"Then ask: 'Anything else you want to figure out?'\n"
+"If the user says no → End the session.\n"
+"If the user says yes → Continue normally.\n\n"
+
+"Current state: {session_state}\n"
+"User's intent: {intent}\n"
+"Turn number in this session: {turn_number}"
 )
+
 
 SUMMARY_PROMPT = PromptTemplate.from_template(
     "Summarize this session as a structured memory record.\n\n"
@@ -113,10 +127,13 @@ class LLMResponder:
                 if resp.status_code == 200:
                     models = resp.json().get("models", [])
                     model_names = [m.get("name", "") for m in models]
+                    configured = config.OLLAMA_MODEL.lower().split(":")[0]
                     self.available = any(
-                        config.OLLAMA_MODEL in name for name in model_names
+                        config.OLLAMA_MODEL.lower() == name.lower()
+                        or configured == name.lower().split(":")[0]
+                        for name in model_names
                     )
-                    logger.debug("LLM availability result: available=%s models=%d", self.available, len(model_names))
+                    logger.debug("LLM availability result: available=%s models=%s", self.available, model_names)
                 else:
                     self.available = False
                     logger.debug("LLM availability check returned HTTP %d", resp.status_code)
@@ -125,22 +142,22 @@ class LLMResponder:
             logger.debug("LLM availability check failed", exc_info=True)
 
         if self.available:
-            # ChatOllama for responses (needs multi-turn message format)
             self._response_llm = ChatOllama(
                 model=config.OLLAMA_MODEL,
                 base_url=config.OLLAMA_BASE_URL,
-                timeout=config.OLLAMA_GENERATE_TIMEOUT_SECONDS,
-                temperature=0.7,
-                num_predict=100,
+                temperature=0.5,
+                num_predict=120,
                 num_ctx=2048,
-            )
-            # OllamaLLM for summaries (single-shot, uses /api/generate — faster)
+                client_kwargs={"timeout": config.OLLAMA_GENERATE_TIMEOUT_SECONDS},
+                async_client_kwargs={"timeout": config.OLLAMA_GENERATE_TIMEOUT_SECONDS},
+                keep_alive="1h",
+            ).bind(think=False)
             summary_llm = OllamaLLM(
                 model=config.OLLAMA_MODEL,
                 base_url=config.OLLAMA_BASE_URL,
-                timeout=config.OLLAMA_SUMMARY_TIMEOUT_SECONDS,
                 temperature=0.3,
-                num_predict=150,
+                num_predict=200,
+                client_kwargs={"timeout": config.OLLAMA_SUMMARY_TIMEOUT_SECONDS},
             )
             self._summary_chain = SUMMARY_PROMPT | summary_llm | StrOutputParser()
 
@@ -186,6 +203,13 @@ class LLMResponder:
             if memory_lines:
                 system_text += "\n\nPrevious session context:\n" + "\n".join(memory_lines)
 
+        # Inject identity facts from the knowledge graph
+        if memory and memory.get("identity"):
+            identity_facts = memory["identity"].get("identity_facts", [])
+            if identity_facts:
+                system_text += "\n\nWhat you know about this user:\n"
+                system_text += "\n".join(f"- {fact}" for fact in identity_facts[:5])
+
         # Build message list directly (avoids per-call ChatPromptTemplate construction)
         messages = [SystemMessage(content=system_text)]
 
@@ -205,11 +229,23 @@ class LLMResponder:
                 len(conversation_history) if conversation_history else 0,
             )
             result = await self._response_llm.ainvoke(messages)
-            text = _sanitize_response(result.content)
-            if text:
-                logger.debug("LLM response generated: %d chars", len(text))
-                return text
-            logger.debug("LLM response was empty after sanitization")
+
+            # gemma4 (thinking model) puts reasoning in result.content when
+            # num_predict is sufficient. If content is still empty, the model
+            # ran out of token budget — raise visibly so it's not silently dropped.
+            text = _sanitize_response(result.content or "")
+            if not text:
+                done_reason = result.response_metadata.get("done_reason", "unknown")
+                eval_count = result.response_metadata.get("eval_count", 0)
+                logger.warning(
+                    "LLM content empty after %d tokens (done_reason=%s). "
+                    "Model may need a larger num_predict budget.",
+                    eval_count, done_reason,
+                )
+                return None
+
+            logger.debug("LLM response generated: %d chars", len(text))
+            return text
         except Exception as e:
             logger.debug("LLM response generation failed: %s", e)
 
@@ -266,8 +302,8 @@ class LLMResponder:
             if text:
                 logger.debug("Session summary generated: %d chars", len(text))
                 return text
-            logger.debug("Session summary was empty after sanitization")
+            logger.warning("Session summary was empty after sanitization")
         except Exception as e:
-            logger.debug("Session summary generation failed: %s", e)
+            logger.warning("Session summary generation failed: %s", e)
 
         return None

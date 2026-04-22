@@ -22,6 +22,7 @@ async def get_session(session_id: str, request: Request):
         logger.debug("GET /api/sessions/%s -> 404", session_id)
         raise HTTPException(status_code=404, detail="Session not found")
     logger.debug("GET /api/sessions/%s -> found", session_id)
+    logger.info("SESSION",session)
     return session
 
 

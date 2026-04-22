@@ -13,7 +13,7 @@ class SessionSurface {
         if (intentTranscript) {
             this.labelElement.textContent = `Working on: ${intentTranscript}`;
         } else {
-            this.labelElement.textContent = "Focus session in progress";
+            this.labelElement.textContent = "Session running";
         }
         this.element.classList.remove("hidden");
         document.getElementById("home-view").classList.add("hidden");
@@ -29,12 +29,12 @@ class SessionSurface {
     }
 
     showInterrupted() {
-        this.labelElement.textContent = "Paused \u2014 reconnecting...";
+        this.labelElement.textContent = "Reconnecting...";
         this._stopTimer();
     }
 
     showResumed() {
-        this.labelElement.textContent = "Focus session in progress";
+        this.labelElement.textContent = "Session running";
         if (!this.timerInterval) this._startTimer();
     }
 

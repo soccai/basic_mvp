@@ -22,6 +22,32 @@ class ConnectionState:
         self.client_sample_rate: int = config.STT_SAMPLE_RATE
         self.speech_started: bool = False
         self.processing: bool = False  # Lock: true while handling a transcript
+        self._current_task: asyncio.Task | None = None  # In-flight _handle_transcript task
+
+
+def _task_error_handler(task: asyncio.Task):
+    """Log unhandled exceptions from background transcript tasks."""
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc:
+        logger.error("Transcript task failed: %s", exc, exc_info=exc)
+
+
+async def _cancel_and_replace(state: ConnectionState, coro) -> asyncio.Task:
+    """Cancel any in-flight _handle_transcript task and start a new one."""
+    if state._current_task and not state._current_task.done():
+        logger.debug("Cancelling in-flight transcript task")
+        state._current_task.cancel()
+        try:
+            await state._current_task
+        except asyncio.CancelledError:
+            pass
+        logger.debug("Previous task cancelled")
+    task = asyncio.create_task(coro)
+    task.add_done_callback(_task_error_handler)
+    state._current_task = task
+    return task
 
 
 async def websocket_handler(websocket: WebSocket):
@@ -37,6 +63,7 @@ async def websocket_handler(websocket: WebSocket):
     event_store = getattr(app.state, "event_store", None)
     llm_responder = getattr(app.state, "llm_responder", None)
     connection_gate = getattr(app.state, "connection_gate", None)
+    identity_graph = getattr(app.state, "identity_graph", None)
 
     # --- Connection gate: enforce single-connection ---
     if connection_gate:
@@ -74,8 +101,11 @@ async def websocket_handler(websocket: WebSocket):
                 raise WebSocketDisconnect(code=message.get("code", 1000))
 
             if "bytes" in message:
-                # Drop audio while processing a response — prevents dual audio
-                if state.processing:
+                # Ignore mic audio while a transcript/response task is still in
+                # flight, including the short window before `processing` flips.
+                if state.processing or (
+                    state._current_task and not state._current_task.done()
+                ):
                     continue
 
                 chunk_bytes = message["bytes"]
@@ -131,14 +161,15 @@ async def websocket_handler(websocket: WebSocket):
                         "is_final": True,
                     })
 
-                    # Route through governing loop
+                    # Route through governing loop (cancel any in-flight request)
                     if transcript and intent_router and session_manager and event_store:
-                        await _handle_transcript(
+                        await _cancel_and_replace(state, _handle_transcript(
                             websocket, transcript,
                             intent_router, session_manager, event_store,
                             tts, llm_responder,
                             connection_state=state,
-                        )
+                            identity_graph=identity_graph,
+                        ))
                     else:
                         state.audio_buffer = bytearray()
                         state.vad.reset()
@@ -159,9 +190,6 @@ async def websocket_handler(websocket: WebSocket):
                         logger.debug("Client sample rate set to %d", state.client_sample_rate)
 
                 elif msg_type == "text_input":
-                    if state.processing:
-                        logger.debug("Text input dropped — still processing")
-                        continue
                     transcript = data.get("text", "").strip()
                     logger.debug("Text input received: %r", transcript[:120])
                     if transcript and intent_router and session_manager and event_store:
@@ -176,12 +204,13 @@ async def websocket_handler(websocket: WebSocket):
                             "text": transcript,
                             "is_final": True,
                         })
-                        await _handle_transcript(
+                        await _cancel_and_replace(state, _handle_transcript(
                             websocket, transcript,
                             intent_router, session_manager, event_store,
                             tts, llm_responder,
                             connection_state=state,
-                        )
+                            identity_graph=identity_graph,
+                        ))
 
                 elif msg_type == "end_session":
                     logger.debug("End session tap received")
@@ -190,13 +219,14 @@ async def websocket_handler(websocket: WebSocket):
                         if session_manager.state == SessionState.SESSION_ACTIVE:
                             session_manager.transition(SessionState.LISTENING)
 
-                        await _handle_transcript(
+                        await _cancel_and_replace(state, _handle_transcript(
                             websocket, "(tap to end)",
                             intent_router, session_manager, event_store,
                             tts, llm_responder,
                             force_intent="END_SESSION",
                             connection_state=state,
-                        )
+                            identity_graph=identity_graph,
+                        ))
 
     except WebSocketDisconnect:
         logger.debug("WS disconnected (state=%s)", session_manager.state.value if session_manager else "n/a")
@@ -230,6 +260,7 @@ async def _handle_transcript(
     llm_responder=None,
     force_intent: str | None = None,
     connection_state: ConnectionState | None = None,
+    identity_graph=None,
 ):
     # Set processing lock — prevents audio/text from triggering a second response
     if connection_state:
@@ -252,6 +283,7 @@ async def _handle_transcript(
             event_store=event_store,
             llm_responder=llm_responder,
             force_intent=force_intent,
+            identity_graph=identity_graph,
         )
 
         # Send session lifecycle event if any
@@ -297,6 +329,10 @@ async def _handle_transcript(
             else:
                 session_manager.transition(SessionState.IDLE)
         logger.debug("Resting state: %s", session_manager.state.value)
+
+    except asyncio.CancelledError:
+        logger.debug("Transcript task cancelled (superseded by new input): %r", transcript[:80])
+        raise  # Re-raise so the task is properly marked as cancelled
 
     finally:
         # Release processing lock

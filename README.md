@@ -42,7 +42,7 @@ That's it. On first run `start.sh` will:
 2. Install all Python dependencies
 3. Download the Whisper `base.en` speech-to-text model (~148 MB)
 4. Download the Piper `amy-medium` text-to-speech voice (~65 MB)
-5. Pull `llama3.1:8b` via Ollama if Ollama is installed (~4.7 GB, one-time)
+5. Pull `gemma4:e4b` via Ollama if Ollama is installed (one-time)
 6. Start the server and open your browser at `http://localhost:8000`
 
 **Subsequent starts take ~3 seconds** — all downloads are cached.
@@ -191,7 +191,7 @@ All settings can be overridden via environment variables:
 |----------|---------|-------------|
 | `LIFEOS_DB_PATH` | `data/lifeos.db` | SQLite database path |
 | `LIFEOS_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
-| `LIFEOS_OLLAMA_MODEL` | `llama3.1:8b` | Model to use for intent + responses |
+| `LIFEOS_OLLAMA_MODEL` | `gemma4:e4b` | Model to use for intent + responses |
 | `LIFEOS_HOST` | `0.0.0.0` | Bind host |
 | `LIFEOS_PORT` | `8000` | Bind port |
 | `LIFEOS_CORS_ORIGINS` | `http://localhost:8000,...` | Allowed CORS origins (comma-separated) |
@@ -280,4 +280,3 @@ Fixed in `ws/handler.py` — update to the latest version.
 - Transcriptions are **ephemeral** : only session lifecycle events are stored
 - Session summaries (LLM-generated) are stored in `data/lifeos.db`
 - The database is a plain SQLite file : inspect it with any SQLite browser
-

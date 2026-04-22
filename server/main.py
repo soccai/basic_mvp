@@ -17,6 +17,7 @@ from server.llm.responder import LLMResponder
 from server.routes import health, timeline, sessions, tts
 from server.ws.handler import websocket_handler
 from server.ws.connection_gate import ConnectionGate
+from server.identity.graph_client import IdentityGraph
 
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL.upper(), logging.INFO),
@@ -66,16 +67,23 @@ async def lifespan(app: FastAPI):
     await llm_responder.check_availability()
     app.state.llm_responder = llm_responder if llm_responder.available else None
 
+    # Init identity graph (Graphiti + Kuzu embedded DB)
+    identity_graph = IdentityGraph()
+    await identity_graph.initialize()
+    app.state.identity_graph = identity_graph
+
     logger.info(
-        "LifeOS Voice Server ready — STT: %s, TTS: %s, Ollama: %s, LLM: %s",
+        "LifeOS Voice Server ready — STT: %s, TTS: %s, Ollama: %s, LLM: %s, Identity: %s",
         "ready" if stt.ready else "unavailable",
         "ready" if tts.ready else "unavailable",
         "available" if ollama.available else "unavailable",
         "available" if llm_responder.available else "unavailable",
+        "available" if identity_graph.available else "unavailable",
     )
 
     yield
 
+    await app.state.identity_graph.close()
     await app.state.connection_gate.shutdown()
     await app.state.session_manager.shutdown()
     await event_store.close()

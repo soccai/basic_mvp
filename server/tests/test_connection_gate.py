@@ -56,16 +56,18 @@ async def test_reconnect_with_same_token():
 
 
 @pytest.mark.asyncio
-async def test_reconnect_without_token_during_grace_rejected():
+async def test_new_connection_during_grace_accepted():
+    """After a tab disconnects, a new client (no token) should be accepted
+    during the grace period — the previous tab is gone."""
     gate = ConnectionGate()
-    accepted, _, _ = await gate.try_acquire(None, None)
+    accepted, token1, _ = await gate.try_acquire(None, None)
     assert accepted is True
 
     await gate.release()
-    # During grace period, new connection without token is rejected
-    accepted, _, reason = await gate.try_acquire(None, None)
-    assert accepted is False
-    assert reason != ""
+    # During grace period, new connection without token is accepted
+    accepted, token2, _ = await gate.try_acquire(None, None)
+    assert accepted is True
+    assert token2 != token1  # new token issued
     await gate.shutdown()
 
 

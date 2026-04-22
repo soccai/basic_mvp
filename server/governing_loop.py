@@ -29,6 +29,48 @@ class LoopContext:
     session_event: dict | None = None  # session lifecycle event for the handler
 
 
+def _build_fallback_summary(
+    session_type: str,
+    intent_transcript: str,
+    interactions: list[dict] | None = None,
+) -> str:
+    """Create a deterministic structured summary when LLM summarization fails."""
+    interactions = interactions or []
+
+    goal = (intent_transcript or "").strip() or "No clear goal stated."
+
+    question_lines: list[str] = []
+    for item in interactions[:3]:
+        transcript = (item.get("transcript") or "").strip()
+        if transcript:
+            question_lines.append(f"- {transcript}")
+    if not question_lines:
+        question_lines.append("- Nothing discussed.")
+
+    action_lines: list[str] = []
+    for item in interactions:
+        response = (item.get("response") or "").strip()
+        if response:
+            action_lines.append(f"- {response}")
+        if len(action_lines) >= 2:
+            break
+    if not action_lines:
+        action_lines.append("- Pick this up next session.")
+
+    follow_up = (
+        "Continue next session."
+        if interactions
+        else "None"
+    )
+
+    return (
+        f"GOAL: {goal}\n"
+        f"QUESTIONS:\n" + "\n".join(question_lines) + "\n"
+        f"ACTIONS:\n" + "\n".join(action_lines) + "\n"
+        f"FOLLOW_UP: {follow_up}"
+    )
+
+
 async def execute_governing_loop(
     transcript: str,
     session_manager: SessionManager,
@@ -36,6 +78,7 @@ async def execute_governing_loop(
     event_store: EventStore,
     llm_responder=None,
     force_intent: str | None = None,
+    identity_graph=None,
 ) -> LoopContext:
     """
     Execute the 12-step governing loop for a single utterance.
@@ -71,6 +114,16 @@ async def execute_governing_loop(
     recent_summaries = await event_store.get_recent_summaries(limit=3)
     ctx.memory = {"recent_sessions": recent_summaries}
     logger.debug("Loop [4/12] Memory: %d recent session summaries", len(recent_summaries))
+
+    # Enrich with identity graph context
+    if identity_graph and identity_graph.available:
+        try:
+            identity_context = await identity_graph.query_user_context(transcript)
+            ctx.memory["identity"] = identity_context
+            logger.debug("Loop [4/12] Identity: %d facts",
+                         len(identity_context.get("identity_facts", [])))
+        except Exception as e:
+            logger.warning("Identity graph query failed: %s", e)
 
     # Step 5: Context evaluated
     ctx.context = {
@@ -123,14 +176,14 @@ async def execute_governing_loop(
                      len(session_manager.active_session.interactions))
 
     # Step 8: LLM response generation.
-    # Outside a session: keep idle guidance deterministic (canned responses).
-    # Inside a session: route all non-lifecycle intents through the LLM so
-    # the user can have natural conversation, not just canned replies.
+    # Inside a session: route all non-lifecycle intents through the LLM.
+    # Outside a session: allow LLM for conversational intents (greetings, casual chat).
     _lifecycle_intents = {Intent.START_SESSION, Intent.END_SESSION}
     _canned_only_intents = {Intent.READ_EMAIL, Intent.REQUEST_FINANCE}
+    _idle_llm_intents = {Intent.CONVERSATION}
     if (
         llm_responder
-        and session_manager.active_session
+        and (session_manager.active_session or ctx.intent_result.intent in _idle_llm_intents)
         and ctx.intent_result.intent not in _lifecycle_intents
         and ctx.intent_result.intent not in _canned_only_intents
     ):
@@ -141,7 +194,10 @@ async def execute_governing_loop(
             intent=ctx.intent_result.intent.value,
             session_state=session_manager.state.value,
             context=ctx.context,
-            conversation_history=list(session_manager.active_session.interactions),
+            conversation_history=(
+                list(session_manager.active_session.interactions)
+                if session_manager.active_session else []
+            ),
             memory=ctx.memory,
         )
         if generated:
@@ -173,15 +229,19 @@ async def execute_governing_loop(
     # Step 9: Engine execution (session lifecycle)
     if ctx.intent_result.intent == Intent.START_SESSION:
         if session_manager.state == SessionState.INTENT_RESOLVED:
-            logger.debug("Loop [9/12] Starting session (transcript=%r)", transcript[:80])
-            session = await session_manager.start_session(transcript)
-            logger.debug("Loop [9/12] Session started: id=%s", session.session_id)
-            ctx.session_event = {
-                "type": "session_started",
-                "session_id": session.session_id,
-                "started_at": session.started_at,
-                "intent_transcript": transcript,
-            }
+            try:
+                logger.debug("Loop [9/12] Starting session (transcript=%r)", transcript[:80])
+                session = await session_manager.start_session(transcript)
+                logger.debug("Loop [9/12] Session started: id=%s", session.session_id)
+                ctx.session_event = {
+                    "type": "session_started",
+                    "session_id": session.session_id,
+                    "started_at": session.started_at,
+                    "intent_transcript": transcript,
+                }
+            except InvalidTransition as e:
+                logger.warning("Could not start session: %s", e)
+                ctx.response_text = "Already in a session. Keep going."
     elif ctx.intent_result.intent == Intent.END_SESSION:
         if session_manager.active_session:
             try:
@@ -219,19 +279,34 @@ async def execute_governing_loop(
                         interactions=interactions,
                     )
                 if not summary:
-                    # Fallback: structured but not LLM-generated
-                    duration_s = (completed.duration_ms or 0) // 1000
-                    interaction_count = len(interactions)
-                    summary = f"Session ({session_type}, {duration_s}s, {interaction_count} interactions). Started: {intent_transcript or 'unknown'}."
-                    logger.debug("Loop [11/12] Using fallback summary (%d chars)", len(summary))
+                    summary = _build_fallback_summary(
+                        session_type=session_type,
+                        intent_transcript=intent_transcript,
+                        interactions=interactions,
+                    )
+                    logger.warning(
+                        "Loop [11/12] Using structured fallback summary (%d chars)",
+                        len(summary),
+                    )
                 else:
                     logger.debug("Loop [11/12] LLM summary generated (%d chars)", len(summary))
                 await event_store.update_session_summary(completed.session_id, summary)
                 ctx.session_event["summary"] = summary
                 logger.info("Loop [11/12] Session summary stored (%d interactions distilled)", len(interactions))
+
+                # Ingest into identity graph for long-term knowledge extraction
+                if identity_graph and identity_graph.available:
+                    try:
+                        await identity_graph.ingest_session(
+                            session_id=completed.session_id,
+                            interactions=interactions,
+                            summary=summary,
+                        )
+                    except Exception as e:
+                        logger.warning("Identity graph ingestion failed: %s", e)
             except InvalidTransition as e:
                 logger.warning("Could not end session: %s", e)
-                ctx.response_text = "Unable to end the session right now. Try again."
+                ctx.response_text = "Can't end right now. Try again."
 
     # Step 10: Event logged
     # Session lifecycle events (created/completed/abandoned) are persisted by

@@ -149,7 +149,7 @@ else
 fi
 
 # ===========================================================================
-# [8/9] Ollama + llama3.1:8b
+# [8/9] Ollama + gemma4:e4b
 # ===========================================================================
 step 7 "Ollama / LLM..."
 if ! command -v ollama &>/dev/null; then
@@ -157,12 +157,12 @@ if ! command -v ollama &>/dev/null; then
   echo "    Install: https://ollama.com/download"
   echo "    Then re-run start.sh — the model will be pulled automatically."
 else
-  if ollama list 2>/dev/null | grep -q "llama3.1:8b"; then
-    ok "llama3.1:8b ready"
+  if ollama list 2>/dev/null | grep -q "gemma4:e4b"; then
+    ok "gemma4:e4b ready"
   else
-    echo "  Pulling llama3.1:8b (~4.7 GB, one-time — this will take a while)..."
-    ollama pull llama3.1:8b
-    ok "llama3.1:8b pulled"
+    echo "  Pulling gemma4:e4b (~4.7 GB, one-time — this will take a while)..."
+    ollama pull gemma4:e4b
+    ok "gemma4:e4b pulled"
   fi
 fi
 
@@ -231,7 +231,7 @@ fi
 # ---------------------------------------------------------------------------
 # Open browser
 # ---------------------------------------------------------------------------
-"$OPEN_CMD" "http://localhost:8000" 2>/dev/null || true
+#"$OPEN_CMD" "http://localhost:8000" 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # Ready
