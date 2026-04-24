@@ -13,6 +13,13 @@ def test_start_variants():
     assert keyword_match("ready") == Intent.START_SESSION
 
 
+def test_soft_start_phrase_does_not_trigger_in_long_noisy_utterance():
+    assert (
+        keyword_match("okay okay so let's go so so that's the there that's the")
+        is None
+    )
+
+
 def test_end_variants():
     assert keyword_match("I'm done") == Intent.END_SESSION
     assert keyword_match("finish") == Intent.END_SESSION
@@ -116,7 +123,7 @@ async def test_active_session_defaults_to_guidance_without_llm():
 
 
 @pytest.mark.asyncio
-async def test_idle_transcript_still_uses_llm_fallback():
+async def test_idle_transcript_skips_llm_fallback_by_default():
     ollama = StubOllama(Intent.UNCLEAR)
     router = IntentRouter(ollama_client=ollama)
 

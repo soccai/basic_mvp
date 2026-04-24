@@ -45,7 +45,7 @@ KEYWORD_PATTERNS: list[tuple[list[str], Intent]] = [
             "ask my parent", "ask my parents",
             "send me money", "send money",
             "i need 10", "i need 20", "i need 30", "i need 40", "i need 50",
-            "i need 100",
+            "i need 100", "some money", "someone money", "need some money",
         ],
         Intent.REQUEST_FINANCE,
     ),
@@ -105,14 +105,33 @@ def keyword_match(transcript: str) -> Intent | None:
     logger.debug("Keyword match — normalized: %r", normalized)
     if not normalized:
         return None
-        
+
     word_count = len(normalized.split())
-    
+
+    # Conversational starters like "let's go" are too noisy in longer sentences.
+    # Keep them as commands only when the full utterance is short and command-like.
+    soft_start_phrases = {
+        "lets go", "let's go", "lets start", "let's start",
+        "im ready", "i'm ready", "ready to start", "prepare",
+    }
+
     for patterns, intent in KEYWORD_PATTERNS:
         for pattern in patterns:
             if " " in pattern:
-                # Multi-word patterns: substring match is safe
+                # Multi-word patterns: substring match is generally safe, except
+                # soft start phrases that should only trigger in short utterances.
                 if pattern in normalized:
+                    if (
+                        intent == Intent.START_SESSION
+                        and pattern in soft_start_phrases
+                        and word_count > 6
+                    ):
+                        logger.debug(
+                            "Keyword skip: %r not treated as START_SESSION in long utterance (%d words)",
+                            pattern,
+                            word_count,
+                        )
+                        continue
                     logger.debug("Keyword matched: %r → %s (multi-word)", pattern, intent.value)
                     return intent
             else:

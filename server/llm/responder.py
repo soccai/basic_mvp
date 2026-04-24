@@ -15,26 +15,15 @@ logger = logging.getLogger(__name__)
 
 GENERIC_RESPONSE_SYSTEM = (
     "You are LifeOS.\n"
-    "You help the user move things forward.\n"
-    "Speak like you already understand the situation.\n"
-    "One short sentence, then the next step or a sharp question.\n"
+    "You are a conversational partner helping the user move things forward.\n"
+    "Speak naturally and conversationally, like a human.\n"
+    "Keep responses brief (1-3 sentences).\n"
+    "If necessary, ask 1-2 follow-up questions to better understand the user's situation or guide them to the next step.\n"
     "No lists. No bullet points. No buildup. No assistant tone.\n"
-    "Never say you're an AI.\n\n"
+    "Never say you're an AI.\n\n"   
     "Current state: {session_state}\n"
     "User's intent: {intent}"
 )
-
-# GUIDED_CLARITY_SYSTEM = (
-#     "You are LifeOS.\n"
-#     "You help the user think through what's stuck.\n"
-#     "Be direct — ask because you want to understand, not because it's a script.\n"
-#     "1-2 sentences max. End with a question that moves things forward.\n"
-#     "No lists. No framing. No warm-up.\n"
-#     "Never say you're an AI.\n\n"
-#     "Current state: {session_state}\n"
-#     "User's intent: {intent}\n"
-#     "Turn number in this session: {turn_number}"
-# )
 
 GUIDED_CLARITY_SYSTEM = (
 "You are LifeOS.\n"
@@ -230,9 +219,6 @@ class LLMResponder:
             )
             result = await self._response_llm.ainvoke(messages)
 
-            # gemma4 (thinking model) puts reasoning in result.content when
-            # num_predict is sufficient. If content is still empty, the model
-            # ran out of token budget — raise visibly so it's not silently dropped.
             text = _sanitize_response(result.content or "")
             if not text:
                 done_reason = result.response_metadata.get("done_reason", "unknown")
@@ -250,6 +236,71 @@ class LLMResponder:
             logger.debug("LLM response generation failed: %s", e)
 
         return None
+
+    async def generate_response_stream(
+        self,
+        transcript: str,
+        intent: str,
+        session_state: str,
+        context: dict | None = None,
+        conversation_history: list[dict] | None = None,
+        memory: dict | None = None,
+    ):
+        """
+        Generate a contextual response via LangChain + Ollama, yielding string chunks.
+        """
+        if not self.available or not self._response_llm:
+            logger.debug("Skipping LLM response stream generation: responder unavailable")
+            return
+
+        safe_transcript = _sanitize_transcript(transcript)
+        turn_number = len(conversation_history) if conversation_history else 1
+
+        if session_state == "session_active" and turn_number <= 4:
+            system_text = GUIDED_CLARITY_SYSTEM.format(
+                session_state=session_state,
+                intent=intent,
+                turn_number=turn_number,
+            )
+        else:
+            system_text = GENERIC_RESPONSE_SYSTEM.format(
+                session_state=session_state,
+                intent=intent,
+            )
+
+        if memory and memory.get("recent_sessions"):
+            summaries = memory["recent_sessions"]
+            memory_lines = [f"- {s['summary']}" for s in summaries if s.get("summary")]
+            if memory_lines:
+                system_text += "\n\nPrevious session context:\n" + "\n".join(memory_lines)
+
+        if memory and memory.get("identity"):
+            identity_facts = memory["identity"].get("identity_facts", [])
+            if identity_facts:
+                system_text += "\n\nWhat you know about this user:\n"
+                system_text += "\n".join(f"- {fact}" for fact in identity_facts[:5])
+
+        messages = [SystemMessage(content=system_text)]
+
+        if conversation_history and len(conversation_history) > 1:
+            prior_turns = conversation_history[-(MAX_CONVERSATION_TURNS + 1):-1]
+            for turn in prior_turns:
+                messages.append(HumanMessage(content=_sanitize_transcript(turn["transcript"])))
+                if "response" in turn:
+                    messages.append(AIMessage(content=turn["response"]))
+
+        messages.append(HumanMessage(content=safe_transcript))
+
+        try:
+            logger.debug(
+                "Generating LLM response stream: intent=%s state=%s turn=%d",
+                intent, session_state, turn_number
+            )
+            async for chunk in self._response_llm.astream(messages):
+                if chunk.content:
+                    yield chunk.content
+        except Exception as e:
+            logger.debug("LLM response stream generation failed: %s", e)
 
     async def generate_session_summary(
         self,

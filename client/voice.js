@@ -62,7 +62,8 @@ class VoiceCapture {
 class AudioPlayer {
     constructor() {
         this.audioContext = null;
-        this._currentSource = null;
+        this._currentSources = [];
+        this.nextStartTime = 0;
     }
 
     _ensureContext() {
@@ -74,10 +75,12 @@ class AudioPlayer {
 
     /** Stop any audio currently playing */
     stopCurrent() {
-        if (this._currentSource) {
-            try { this._currentSource.stop(); } catch {}
-            this._currentSource = null;
-        }
+        this._currentSources.forEach((source) => {
+            try { source.stop(); } catch {}
+        });
+        this._currentSources = [];
+        this.nextStartTime = 0;
+        
         // Also cancel browser speech synthesis if active
         if ("speechSynthesis" in window) {
             speechSynthesis.cancel();
@@ -85,25 +88,36 @@ class AudioPlayer {
     }
 
     async playWAV(arrayBuffer) {
-        // Stop any previous playback to prevent overlapping voices
-        this.stopCurrent();
         try {
             const ctx = this._ensureContext();
             if (ctx.state === "suspended") await ctx.resume();
+            
             const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
             const source = ctx.createBufferSource();
             source.buffer = audioBuffer;
             source.connect(ctx.destination);
-            this._currentSource = source;
-            source.start();
+            
+            // Gapless scheduling
+            const now = ctx.currentTime;
+            // If the next start time is in the past, start immediately
+            if (this.nextStartTime < now) {
+                this.nextStartTime = now + 0.05; // tiny buffer for safety
+            }
+            source.start(this.nextStartTime);
+            this.nextStartTime += audioBuffer.duration;
+            
+            this._currentSources.push(source);
+            
             return new Promise((resolve) => {
                 source.onended = () => {
-                    this._currentSource = null;
+                    const idx = this._currentSources.indexOf(source);
+                    if (idx > -1) {
+                        this._currentSources.splice(idx, 1);
+                    }
                     resolve();
                 };
             });
         } catch (e) {
-            this._currentSource = null;
             console.error("Audio playback failed:", e);
         }
     }

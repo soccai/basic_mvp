@@ -42,13 +42,43 @@ class STTAdapter:
             return ""
         try:
             logger.debug("STT transcribe starting: %d samples", len(audio))
-            segments, _ = self.model.transcribe(
+            segments, info = self.model.transcribe(
                 audio,
                 beam_size=config.WHISPER_BEAM_SIZE,
                 language="en",
-                vad_filter=False,
+                vad_filter=True,
+                condition_on_previous_text=False,
             )
-            transcript = " ".join(seg.text for seg in segments).strip()
+
+            segment_list = list(segments)
+            transcript = " ".join(seg.text for seg in segment_list).strip()
+
+            if not transcript:
+                logger.debug("STT produced empty transcript")
+                return ""
+
+            no_speech_prob = getattr(info, "no_speech_prob", None)
+            if no_speech_prob is None and segment_list:
+                probs = [
+                    getattr(seg, "no_speech_prob", None)
+                    for seg in segment_list
+                    if getattr(seg, "no_speech_prob", None) is not None
+                ]
+                if probs:
+                    no_speech_prob = float(sum(probs) / len(probs))
+
+            cleaned = " ".join(transcript.lower().split())
+            word_count = len(cleaned.split())
+
+            # Guard against common Whisper hallucinations on near-silence/noise.
+            if no_speech_prob is not None and no_speech_prob > 0.60 and word_count <= 8:
+                logger.info(
+                    "STT transcript dropped as likely noise (no_speech_prob=%.3f, words=%d)",
+                    no_speech_prob,
+                    word_count,
+                )
+                return ""
+
             logger.debug("STT transcribe completed: %d chars", len(transcript))
             return transcript
         except Exception as e:

@@ -16,6 +16,7 @@ INTENT_PROMPT = PromptTemplate.from_template(
     "- END_SESSION (user wants to finish the current session)\n"
     "- REQUEST_GUIDANCE (user is asking what to do)\n"
     "- READ_EMAIL (user wants to check, read, or manage their emails)\n"
+    "- REQUEST_FINANCE (user is asking for or about money, payments, or finance)\n"
     "- CONVERSATION (user is greeting, making small talk, or being casual)\n"
     "- UNCLEAR (cannot determine intent)\n\n"
     "User said: \"{transcript}\"\n\n"

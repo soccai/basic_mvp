@@ -1,6 +1,8 @@
 import logging
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import AsyncIterator
 
 from server.intent.keywords import Intent
 from server.intent.router import IntentResult, IntentRouter
@@ -26,6 +28,7 @@ class LoopContext:
     policy: dict = field(default_factory=dict)
     intent_result: IntentResult | None = None
     response_text: str = ""
+    response_stream: AsyncIterator[str] | None = None
     session_event: dict | None = None  # session lifecycle event for the handler
 
 
@@ -79,6 +82,7 @@ async def execute_governing_loop(
     llm_responder=None,
     force_intent: str | None = None,
     identity_graph=None,
+    latency_tracker: dict | None = None,
 ) -> LoopContext:
     """
     Execute the 12-step governing loop for a single utterance.
@@ -146,6 +150,7 @@ async def execute_governing_loop(
         return ctx
 
     # Step 7: Orchestration decision (intent classification)
+    intent_start = time.perf_counter()
     if force_intent:
         ctx.intent_result = IntentResult(
             intent=Intent(force_intent),
@@ -162,6 +167,8 @@ async def execute_governing_loop(
         ctx.intent_result = await intent_router.classify(
             transcript, routing_state
         )
+    if latency_tracker is not None:
+        latency_tracker["intent_ms"] = int((time.perf_counter() - intent_start) * 1000)
     logger.info("Loop [7/12] Intent: %s (%s)",
                 ctx.intent_result.intent.value, ctx.intent_result.method)
 
@@ -187,9 +194,10 @@ async def execute_governing_loop(
         and ctx.intent_result.intent not in _lifecycle_intents
         and ctx.intent_result.intent not in _canned_only_intents
     ):
-        logger.debug("Loop [8/12] Requesting LLM response (intent=%s, state=%s)",
+        logger.debug("Loop [8/12] Requesting LLM response stream (intent=%s, state=%s)",
                      ctx.intent_result.intent.value, session_manager.state.value)
-        generated = await llm_responder.generate_response(
+        llm_start = time.perf_counter()
+        ctx.response_stream = llm_responder.generate_response_stream(
             transcript=transcript,
             intent=ctx.intent_result.intent.value,
             session_state=session_manager.state.value,
@@ -200,29 +208,24 @@ async def execute_governing_loop(
             ),
             memory=ctx.memory,
         )
-        if generated:
-            ctx.response_text = generated
-            # Store LLM response in the ephemeral interaction for multi-turn context
-            if session_manager.active_session and session_manager.active_session.interactions:
-                session_manager.active_session.interactions[-1]["response"] = generated
-            logger.info("Loop [8/12] LLM response generated (%d chars)", len(generated))
-        else:
-            logger.debug("Loop [8/12] LLM returned nothing — will use canned")
+        if latency_tracker is not None:
+            latency_tracker["llm_ms"] = int((time.perf_counter() - llm_start) * 1000)
+        logger.info("Loop [8/12] LLM response stream initialized")
     else:
         logger.debug("Loop [8/12] Skipping LLM (no responder=%s, active_session=%s, lifecycle=%s)",
                      llm_responder is not None,
                      session_manager.active_session is not None,
                      ctx.intent_result.intent in _lifecycle_intents)
 
-    # Fallback to canned response
-    if not ctx.response_text:
+    # Fallback to canned response if no stream and no text
+    if not ctx.response_text and not ctx.response_stream:
         response_state = (
             SessionState.SESSION_ACTIVE.value
             if session_manager.active_session
             else session_manager.state.value
         )
         ctx.response_text = intent_router._get_response(
-            ctx.intent_result.intent, response_state
+            ctx.intent_result.intent, response_state, transcript
         )
         logger.info("Loop [8/12] Using canned response")
 

@@ -24,7 +24,7 @@ AUDIO_CHANNELS = 1
 
 # VAD
 VAD_MIN_SILENCE_MS = 800           # wait 0.8s of silence before treating speech as finished
-VAD_ENERGY_THRESHOLD = 0.015
+VAD_ENERGY_THRESHOLD = 0.04
 VAD_MIN_SPEECH_MS = 200            # ignore utterances shorter than 200ms (fragments)
 
 # Session
@@ -43,6 +43,7 @@ OLLAMA_MODEL = os.environ.get("LIFEOS_OLLAMA_MODEL", "gemma4:e4b")
 OLLAMA_TIMEOUT_SECONDS = 10
 OLLAMA_GENERATE_TIMEOUT_SECONDS = 60   # gemma4 thinking model needs ~5-8s for reasoning alone
 OLLAMA_SUMMARY_TIMEOUT_SECONDS = 90   # summaries are longer; budget accordingly
+INTENT_LLM_FALLBACK_ENABLED = os.environ.get("LIFEOS_INTENT_LLM_FALLBACK", "true").lower() == "true"
 
 # Graphiti / Kuzu (embedded graph DB — no external server needed)
 KUZU_DB_PATH = Path(os.environ.get("LIFEOS_KUZU_DB", str(DATA_DIR / "identity.kuzu")))

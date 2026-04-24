@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -101,14 +102,8 @@ async def websocket_handler(websocket: WebSocket):
                 raise WebSocketDisconnect(code=message.get("code", 1000))
 
             if "bytes" in message:
-                # Ignore mic audio while a transcript/response task is still in
-                # flight, including the short window before `processing` flips.
-                if state.processing or (
-                    state._current_task and not state._current_task.done()
-                ):
-                    continue
-
                 chunk_bytes = message["bytes"]
+
                 state.audio_buffer.extend(chunk_bytes)
                 logger.debug("Audio chunk: %d bytes, buffer total: %d bytes",
                              len(chunk_bytes), len(state.audio_buffer))
@@ -131,6 +126,7 @@ async def websocket_handler(websocket: WebSocket):
                         SessionState.IDLE, SessionState.SESSION_ACTIVE,
                     ):
                         session_manager.transition(SessionState.LISTENING)
+                    await websocket.send_json({"type": "speech_started"})
 
                 # Fragment too short — discard buffer and keep listening
                 if vad_result == "discard":
@@ -142,17 +138,23 @@ async def websocket_handler(websocket: WebSocket):
                 if vad_result == "speech_end" and len(state.audio_buffer) > 0:
                     logger.debug("VAD: speech_end — buffer %d bytes, starting STT",
                                  len(state.audio_buffer))
+                    state.speech_started = False
+                    
                     full_audio = prepare_for_stt(
                         bytes(state.audio_buffer), state.client_sample_rate
                     )
+                    # Clear the buffer so new speech during STT/LLM starts fresh
+                    state.audio_buffer = bytearray()
 
                     # Transcribe in executor to avoid blocking
                     transcript = ""
+                    stt_start = time.perf_counter()
                     if stt and stt.ready:
                         loop = asyncio.get_running_loop()
                         transcript = await loop.run_in_executor(
                             None, stt.transcribe, full_audio
                         )
+                    stt_ms = int((time.perf_counter() - stt_start) * 1000)
                     logger.debug("STT result: %r", transcript[:120] if transcript else "(empty)")
 
                     await websocket.send_json({
@@ -163,14 +165,22 @@ async def websocket_handler(websocket: WebSocket):
 
                     # Route through governing loop (cancel any in-flight request)
                     if transcript and intent_router and session_manager and event_store:
+                        latency_tracker = {"stt_ms": stt_ms}
+                        turn_start = time.perf_counter()
                         await _cancel_and_replace(state, _handle_transcript(
                             websocket, transcript,
                             intent_router, session_manager, event_store,
                             tts, llm_responder,
                             connection_state=state,
                             identity_graph=identity_graph,
+                            latency_tracker=latency_tracker,
+                            turn_start=turn_start,
                         ))
                     else:
+                        if not transcript:
+                            logger.debug(
+                                "Skipping transcript handling: empty transcript after STT (likely silence/noise)"
+                            )
                         state.audio_buffer = bytearray()
                         state.vad.reset()
                         state.speech_started = False
@@ -189,6 +199,12 @@ async def websocket_handler(websocket: WebSocket):
                         state.client_sample_rate = int(rate)
                         logger.debug("Client sample rate set to %d", state.client_sample_rate)
 
+                elif msg_type == "flush_audio":
+                    logger.debug("Client requested audio flush")
+                    state.audio_buffer = bytearray()
+                    state.vad.reset()
+                    state.speech_started = False
+
                 elif msg_type == "text_input":
                     transcript = data.get("text", "").strip()
                     logger.debug("Text input received: %r", transcript[:120])
@@ -204,12 +220,16 @@ async def websocket_handler(websocket: WebSocket):
                             "text": transcript,
                             "is_final": True,
                         })
+                        latency_tracker = {"stt_ms": 0}
+                        turn_start = time.perf_counter()
                         await _cancel_and_replace(state, _handle_transcript(
                             websocket, transcript,
                             intent_router, session_manager, event_store,
                             tts, llm_responder,
                             connection_state=state,
                             identity_graph=identity_graph,
+                            latency_tracker=latency_tracker,
+                            turn_start=turn_start,
                         ))
 
                 elif msg_type == "end_session":
@@ -219,6 +239,8 @@ async def websocket_handler(websocket: WebSocket):
                         if session_manager.state == SessionState.SESSION_ACTIVE:
                             session_manager.transition(SessionState.LISTENING)
 
+                        latency_tracker = {"stt_ms": 0}
+                        turn_start = time.perf_counter()
                         await _cancel_and_replace(state, _handle_transcript(
                             websocket, "(tap to end)",
                             intent_router, session_manager, event_store,
@@ -226,6 +248,8 @@ async def websocket_handler(websocket: WebSocket):
                             force_intent="END_SESSION",
                             connection_state=state,
                             identity_graph=identity_graph,
+                            latency_tracker=latency_tracker,
+                            turn_start=turn_start,
                         ))
 
     except WebSocketDisconnect:
@@ -261,6 +285,8 @@ async def _handle_transcript(
     force_intent: str | None = None,
     connection_state: ConnectionState | None = None,
     identity_graph=None,
+    latency_tracker: dict | None = None,
+    turn_start: float | None = None,
 ):
     # Set processing lock — prevents audio/text from triggering a second response
     if connection_state:
@@ -284,6 +310,7 @@ async def _handle_transcript(
             llm_responder=llm_responder,
             force_intent=force_intent,
             identity_graph=identity_graph,
+            latency_tracker=latency_tracker,
         )
 
         # Send session lifecycle event if any
@@ -300,27 +327,78 @@ async def _handle_transcript(
             "response_text": ctx.response_text,
         })
 
-        # Flush audio buffer before TTS — discard any audio captured during processing
+        # Flush audio buffer before TTS, but preserve any barge-in audio
         if connection_state:
-            connection_state.audio_buffer = bytearray()
-            connection_state.vad.reset()
-            connection_state.speech_started = False
-            logger.debug("Audio buffer flushed after response")
+            if connection_state.speech_started:
+                logger.debug("User is speaking, preserving audio buffer for barge-in")
+            else:
+                connection_state.audio_buffer = bytearray()
+                connection_state.vad.reset()
+                logger.debug("Audio buffer flushed after response")
 
         # TTS delivery
-        if tts and tts.ready and ctx.response_text:
+        tts_start = time.perf_counter()
+        
+        if ctx.response_stream:
             loop = asyncio.get_running_loop()
-            wav_bytes = await loop.run_in_executor(None, tts.synthesize, ctx.response_text)
-            if wav_bytes:
-                logger.debug("TTS: sending %d WAV bytes", len(wav_bytes))
-                await websocket.send_bytes(wav_bytes)
-                await websocket.send_json({"type": "audio_done"})
-            else:
-                logger.debug("TTS: empty output, falling back to tts_text")
+            full_text = ""
+            current_sentence = ""
+            import re
+            
+            async for chunk in ctx.response_stream:
+                full_text += chunk
+                current_sentence += chunk
+                
+                while True:
+                    match = re.search(r'([.?!]\s+|\n+)', current_sentence)
+                    if not match:
+                        break
+                    
+                    end_idx = match.end()
+                    clean_sentence = current_sentence[:end_idx].strip()
+                    if clean_sentence:
+                        if tts and tts.ready:
+                            wav_bytes = await loop.run_in_executor(None, tts.synthesize, clean_sentence)
+                            if wav_bytes:
+                                logger.debug("TTS chunk: sending %d WAV bytes", len(wav_bytes))
+                                await websocket.send_bytes(wav_bytes)
+                        await websocket.send_json({"type": "bot_response_chunk", "text": clean_sentence})
+                    
+                    current_sentence = current_sentence[end_idx:]
+            
+            # Send any remaining text
+            clean_sentence = current_sentence.strip()
+            if clean_sentence:
+                if tts and tts.ready:
+                    wav_bytes = await loop.run_in_executor(None, tts.synthesize, clean_sentence)
+                    if wav_bytes:
+                        logger.debug("TTS chunk: sending %d WAV bytes", len(wav_bytes))
+                        await websocket.send_bytes(wav_bytes)
+                await websocket.send_json({"type": "bot_response_chunk", "text": clean_sentence})
+                
+            await websocket.send_json({"type": "audio_done"})
+            
+            # Store full response in ephemeral interaction
+            if session_manager.active_session and session_manager.active_session.interactions:
+                session_manager.active_session.interactions[-1]["response"] = full_text.strip()
+                
+        else:
+            if tts and tts.ready and ctx.response_text:
+                loop = asyncio.get_running_loop()
+                wav_bytes = await loop.run_in_executor(None, tts.synthesize, ctx.response_text)
+                if wav_bytes:
+                    logger.debug("TTS: sending %d WAV bytes", len(wav_bytes))
+                    await websocket.send_bytes(wav_bytes)
+                    await websocket.send_json({"type": "audio_done"})
+                else:
+                    logger.debug("TTS: empty output, falling back to tts_text")
+                    await websocket.send_json({"type": "tts_text", "text": ctx.response_text})
+            elif ctx.response_text:
+                logger.debug("TTS unavailable, sending tts_text fallback")
                 await websocket.send_json({"type": "tts_text", "text": ctx.response_text})
-        elif ctx.response_text:
-            logger.debug("TTS unavailable, sending tts_text fallback")
-            await websocket.send_json({"type": "tts_text", "text": ctx.response_text})
+
+        if latency_tracker is not None:
+            latency_tracker["tts_ms"] = int((time.perf_counter() - tts_start) * 1000)
 
         # Return state to resting position
         if session_manager.state == SessionState.INTENT_RESOLVED:
@@ -329,6 +407,19 @@ async def _handle_transcript(
             else:
                 session_manager.transition(SessionState.IDLE)
         logger.debug("Resting state: %s", session_manager.state.value)
+
+        if turn_start is not None and latency_tracker is not None:
+            turn_total_ms = int((time.perf_counter() - turn_start) * 1000)
+            stt_ms = latency_tracker.get("stt_ms", 0)
+            total_ms = turn_total_ms + stt_ms
+            logger.info(
+                "Turn completed in %dms (STT: %dms, Intent: %dms, LLM: %dms, TTS: %dms)",
+                total_ms,
+                stt_ms,
+                latency_tracker.get("intent_ms", 0),
+                latency_tracker.get("llm_ms", 0),
+                latency_tracker.get("tts_ms", 0),
+            )
 
     except asyncio.CancelledError:
         logger.debug("Transcript task cancelled (superseded by new input): %r", transcript[:80])

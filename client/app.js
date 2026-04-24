@@ -10,7 +10,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         "Your day is synced. Calendar, messages, tasks ready.",
         "What do you want to move forward right now?",
     ];
+    let lastIdlePrompt = null;
     let currentGuidePrompt = IDLE_PROMPTS[0];
+    let currentBotResponse = "";
+    let playingChunksCount = 0;
 
     const GUIDE_NUDGE = "Say 'start' when you're ready.";
     const SESSION_COMPLETE_TEXT = "Done. Take a beat.";
@@ -57,7 +60,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 voiceCapture.recording = true;
                 micButton.classList.add("active");
                 listeningIndicator.classList.remove("hidden");
-                beginListeningPrompt();
             }
         }
     }
@@ -76,8 +78,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     }
 
+    function pickPromptWithoutImmediateRepeat(options, lastPrompt) {
+        if (options.length <= 1) return options[0] || "";
+        const filtered = options.filter((option) => option !== lastPrompt);
+        const pool = filtered.length > 0 ? filtered : options;
+        return pool[Math.floor(Math.random() * pool.length)];
+    }
+
     function setIdlePrompt() {
-        currentGuidePrompt = IDLE_PROMPTS[Math.floor(Math.random() * IDLE_PROMPTS.length)];
+        currentGuidePrompt = pickPromptWithoutImmediateRepeat(IDLE_PROMPTS, lastIdlePrompt);
+        lastIdlePrompt = currentGuidePrompt;
         statusText.textContent = currentGuidePrompt;
     }
 
@@ -142,13 +152,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         clearNudgeTimer();
         nudgeTimer = setTimeout(async () => {
             if (uiState === "listening" && !isSpeaking) {
-                statusText.textContent = currentGuidePrompt;
-                await speakText(currentGuidePrompt);
-                // Secondary nudge after another 5 s if still silent
-                if (uiState === "listening" && !isSpeaking) {
-                    statusText.textContent = GUIDE_NUDGE;
-                    await speakText(GUIDE_NUDGE);
-                }
+                statusText.textContent = GUIDE_NUDGE;
+                await speakText(GUIDE_NUDGE);
             }
         }, 5000);
     }
@@ -221,6 +226,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             micButton.classList.remove("active");
             listeningIndicator.classList.add("hidden");
             setIdlePrompt();
+            wsClient.sendJSON({ type: "flush_audio" });
         }
     });
 
@@ -232,6 +238,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (sessionMicButton.classList.contains("active")) {
             voiceCapture.recording = false;
             sessionMicButton.classList.remove("active");
+            wsClient.sendJSON({ type: "flush_audio" });
         } else {
             if (!voiceCapture.recording && !voiceCapture.stream) {
                 await voiceCapture.start();
@@ -298,18 +305,34 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     });
 
+    wsClient.on("speech_started", () => {
+        clearNudgeTimer();
+    });
+
     wsClient.on("intent", (msg) => {
         if (msg.response_text) {
+            currentBotResponse = msg.response_text;
             statusText.textContent = msg.response_text;
+        } else {
+            currentBotResponse = "";
         }
     });
 
+    wsClient.on("bot_response_chunk", (msg) => {
+        currentBotResponse += (currentBotResponse ? " " : "") + msg.text;
+        statusText.textContent = currentBotResponse;
+    });
+
     wsClient.on("audio", async (arrayBuffer) => {
+        playingChunksCount++;
         setSpeaking(true);
         try {
             await audioPlayer.playWAV(arrayBuffer);
         } finally {
-            setSpeaking(false);
+            playingChunksCount--;
+            if (playingChunksCount === 0) {
+                setSpeaking(false);
+            }
         }
     });
 

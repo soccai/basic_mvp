@@ -10,29 +10,35 @@ from server.session.models import SessionState
 class StubLLMResponder:
     async def generate_response(self, **kwargs):
         return "This should not replace the unclear fallback."
+    async def generate_response_stream(self, **kwargs):
+        yield "This should not replace the unclear fallback."
 
 
 class SessionLLMResponder:
     async def generate_response(self, **kwargs):
         return "Let's keep moving on that."
+    async def generate_response_stream(self, **kwargs):
+        yield "Let's keep moving on that."
 
 
 class FallbackSummaryResponder:
     async def generate_response(self, **kwargs):
         return "Let's keep moving on that."
-
+    async def generate_response_stream(self, **kwargs):
+        yield "Let's keep moving on that."
+    
     async def generate_session_summary(self, **kwargs):
         return None
 
 
 def test_guidance_prompt_response():
     router = IntentRouter()
-    assert router._get_response(Intent.REQUEST_GUIDANCE, "idle") == "Start a session and we'll get into it."
+    assert router._get_response(Intent.REQUEST_GUIDANCE, "idle") == "I'd love to help with that. Start a session and we can dig into it together."
 
 
 def test_end_session_response():
     router = IntentRouter()
-    assert router._get_response(Intent.END_SESSION, "session_active") == "Done. Take a beat."
+    assert router._get_response(Intent.END_SESSION, "session_active") == "You moved something forward. Take a pause."
 
 
 @pytest.mark.asyncio
@@ -55,7 +61,7 @@ async def test_unclear_fallback_stays_deterministic(event_store):
 
     assert (
         ctx.response_text
-        == "Didn't catch that. Say 'start' or just talk to me."
+        == "I can help with that in a session. Say 'start' when you're ready, or just say hi."
     )
 
 
@@ -82,7 +88,8 @@ async def test_active_session_uses_llm_response(event_store):
         llm_responder=llm_responder,
     )
 
-    assert ctx.response_text == "Let's keep moving on that."
+    chunks = [c async for c in ctx.response_stream] if ctx.response_stream else []
+    assert "".join(chunks) == "Let's keep moving on that."
 
 
 @pytest.mark.asyncio
